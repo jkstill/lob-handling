@@ -1,0 +1,541 @@
+JKSTILL@ora192rac-scan/pdb1.jks.com % desc dbms_lob
+PROCEDURE APPEND
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       BLOB                    IN/OUT
+ SRC_LOB                        BLOB                    IN    
+PROCEDURE APPEND
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       CLOB                    IN/OUT
+ SRC_LOB                        CLOB                    IN    
+PROCEDURE CLOB2FILE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ CL                             CLOB                    IN    
+ FLOCATION                      VARCHAR2                IN    
+ FNAME                          VARCHAR2                IN    
+ CSID                           NUMBER                  IN     DEFAULT
+ OPENMODE                       VARCHAR2                IN     DEFAULT
+PROCEDURE CLOSE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+PROCEDURE CLOSE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+PROCEDURE CLOSE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN/OUT
+FUNCTION COMPARE RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_1                          BLOB                    IN    
+ LOB_2                          BLOB                    IN    
+ AMOUNT                         NUMBER(38)              IN     DEFAULT
+ OFFSET_1                       NUMBER(38)              IN     DEFAULT
+ OFFSET_2                       NUMBER(38)              IN     DEFAULT
+FUNCTION COMPARE RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_1                          CLOB                    IN    
+ LOB_2                          CLOB                    IN    
+ AMOUNT                         NUMBER(38)              IN     DEFAULT
+ OFFSET_1                       NUMBER(38)              IN     DEFAULT
+ OFFSET_2                       NUMBER(38)              IN     DEFAULT
+FUNCTION COMPARE RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_1                         BINARY FILE LOB         IN    
+ FILE_2                         BINARY FILE LOB         IN    
+ AMOUNT                         NUMBER(38)              IN    
+ OFFSET_1                       NUMBER(38)              IN     DEFAULT
+ OFFSET_2                       NUMBER(38)              IN     DEFAULT
+PROCEDURE CONVERTTOBLOB
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       BLOB                    IN/OUT
+ SRC_CLOB                       CLOB                    IN    
+ AMOUNT                         NUMBER(38)              IN    
+ DEST_OFFSET                    NUMBER(38)              IN/OUT
+ SRC_OFFSET                     NUMBER(38)              IN/OUT
+ BLOB_CSID                      NUMBER                  IN    
+ LANG_CONTEXT                   NUMBER(38)              IN/OUT
+ WARNING                        NUMBER(38)              OUT   
+PROCEDURE CONVERTTOCLOB
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       CLOB                    IN/OUT
+ SRC_BLOB                       BLOB                    IN    
+ AMOUNT                         NUMBER(38)              IN    
+ DEST_OFFSET                    NUMBER(38)              IN/OUT
+ SRC_OFFSET                     NUMBER(38)              IN/OUT
+ BLOB_CSID                      NUMBER                  IN    
+ LANG_CONTEXT                   NUMBER(38)              IN/OUT
+ WARNING                        NUMBER(38)              OUT   
+PROCEDURE COPY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       BLOB                    IN/OUT
+ SRC_LOB                        BLOB                    IN    
+ AMOUNT                         NUMBER(38)              IN    
+ DEST_OFFSET                    NUMBER(38)              IN     DEFAULT
+ SRC_OFFSET                     NUMBER(38)              IN     DEFAULT
+PROCEDURE COPY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       CLOB                    IN/OUT
+ SRC_LOB                        CLOB                    IN    
+ AMOUNT                         NUMBER(38)              IN    
+ DEST_OFFSET                    NUMBER(38)              IN     DEFAULT
+ SRC_OFFSET                     NUMBER(38)              IN     DEFAULT
+PROCEDURE COPY_DBFS_LINK
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       BLOB                    IN/OUT
+ SRC_LOB                        BLOB                    IN    
+ OPTIONS                        BINARY_INTEGER          IN    
+PROCEDURE COPY_DBFS_LINK
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       CLOB                    IN/OUT
+ SRC_LOB                        CLOB                    IN    
+ OPTIONS                        BINARY_INTEGER          IN    
+PROCEDURE COPY_FROM_DBFS_LINK
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+PROCEDURE COPY_FROM_DBFS_LINK
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+PROCEDURE CREATETEMPORARY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ CACHE                          BOOLEAN                 IN    
+ DUR                            BINARY_INTEGER          IN     DEFAULT
+PROCEDURE CREATETEMPORARY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ CACHE                          BOOLEAN                 IN    
+ DUR                            BINARY_INTEGER          IN     DEFAULT
+FUNCTION DBFS_LINK_GENERATE_PATH RETURNS VARCHAR2
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+ STORAGE_DIR                    VARCHAR2                IN    
+FUNCTION DBFS_LINK_GENERATE_PATH RETURNS VARCHAR2
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+ STORAGE_DIR                    VARCHAR2                IN    
+PROCEDURE ERASE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN/OUT
+ OFFSET                         NUMBER(38)              IN     DEFAULT
+PROCEDURE ERASE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN/OUT
+ OFFSET                         NUMBER(38)              IN     DEFAULT
+PROCEDURE FILECLOSE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN/OUT
+PROCEDURE FILECLOSEALL
+FUNCTION FILEEXISTS RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN    
+PROCEDURE FILEGETNAME
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN    
+ DIR_ALIAS                      VARCHAR2                OUT   
+ FILENAME                       VARCHAR2                OUT   
+FUNCTION FILEISOPEN RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN    
+PROCEDURE FILEOPEN
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN/OUT
+ OPEN_MODE                      BINARY_INTEGER          IN     DEFAULT
+PROCEDURE FRAGMENT_DELETE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN    
+ OFFSET                         NUMBER(38)              IN    
+PROCEDURE FRAGMENT_DELETE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN    
+ OFFSET                         NUMBER(38)              IN    
+PROCEDURE FRAGMENT_INSERT
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN    
+ OFFSET                         NUMBER(38)              IN    
+ BUFFER                         RAW                     IN    
+PROCEDURE FRAGMENT_INSERT
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN    
+ OFFSET                         NUMBER(38)              IN    
+ BUFFER                         VARCHAR2                IN    
+PROCEDURE FRAGMENT_MOVE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN    
+ SRC_OFFSET                     NUMBER(38)              IN    
+ DEST_OFFSET                    NUMBER(38)              IN    
+PROCEDURE FRAGMENT_MOVE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN    
+ SRC_OFFSET                     NUMBER(38)              IN    
+ DEST_OFFSET                    NUMBER(38)              IN    
+PROCEDURE FRAGMENT_REPLACE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ OLD_AMOUNT                     NUMBER(38)              IN    
+ NEW_AMOUNT                     NUMBER(38)              IN    
+ OFFSET                         NUMBER(38)              IN    
+ BUFFER                         RAW                     IN    
+PROCEDURE FRAGMENT_REPLACE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ OLD_AMOUNT                     NUMBER(38)              IN    
+ NEW_AMOUNT                     NUMBER(38)              IN    
+ OFFSET                         NUMBER(38)              IN    
+ BUFFER                         VARCHAR2                IN    
+PROCEDURE FREETEMPORARY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+PROCEDURE FREETEMPORARY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+FUNCTION GETCHUNKSIZE RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+FUNCTION GETCHUNKSIZE RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+FUNCTION GETCONTENTTYPE RETURNS VARCHAR2
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+FUNCTION GETCONTENTTYPE RETURNS VARCHAR2
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+FUNCTION GETLENGTH RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+FUNCTION GETLENGTH RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+FUNCTION GETLENGTH RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN    
+FUNCTION GETOPTIONS RETURNS BINARY_INTEGER
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+ OPTION_TYPES                   BINARY_INTEGER          IN    
+FUNCTION GETOPTIONS RETURNS BINARY_INTEGER
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+ OPTION_TYPES                   BINARY_INTEGER          IN    
+FUNCTION GET_DBFS_LINK RETURNS VARCHAR2
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+FUNCTION GET_DBFS_LINK RETURNS VARCHAR2
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+PROCEDURE GET_DBFS_LINK_STATE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+ STORAGE_PATH                   VARCHAR2                OUT   
+ STATE                          BINARY_INTEGER          OUT   
+ CACHED                         BOOLEAN                 OUT   
+PROCEDURE GET_DBFS_LINK_STATE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+ STORAGE_PATH                   VARCHAR2                OUT   
+ STATE                          BINARY_INTEGER          OUT   
+ CACHED                         BOOLEAN                 OUT   
+PROCEDURE GET_DEDUPLICATE_REGIONS
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+ REGION_TABLE                   BLOB_DEDUPLICATE_REGION_TAB IN/OUT
+PROCEDURE GET_DEDUPLICATE_REGIONS
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+ REGION_TABLE                   CLOB_DEDUPLICATE_REGION_TAB IN/OUT
+FUNCTION GET_STORAGE_LIMIT RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+FUNCTION GET_STORAGE_LIMIT RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+FUNCTION INSTR RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+ PATTERN                        RAW                     IN    
+ OFFSET                         NUMBER(38)              IN     DEFAULT
+ NTH                            NUMBER(38)              IN     DEFAULT
+FUNCTION INSTR RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+ PATTERN                        VARCHAR2                IN    
+ OFFSET                         NUMBER(38)              IN     DEFAULT
+ NTH                            NUMBER(38)              IN     DEFAULT
+FUNCTION INSTR RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN    
+ PATTERN                        RAW                     IN    
+ OFFSET                         NUMBER(38)              IN     DEFAULT
+ NTH                            NUMBER(38)              IN     DEFAULT
+FUNCTION ISOPEN RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+FUNCTION ISOPEN RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+FUNCTION ISOPEN RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN    
+FUNCTION ISREMOTE RETURNS BOOLEAN
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+FUNCTION ISREMOTE RETURNS BOOLEAN
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+FUNCTION ISSECUREFILE RETURNS BOOLEAN
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+FUNCTION ISSECUREFILE RETURNS BOOLEAN
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+FUNCTION ISTEMPORARY RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+FUNCTION ISTEMPORARY RETURNS NUMBER(38)
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+PROCEDURE LOADBLOBFROMFILE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       BLOB                    IN/OUT
+ SRC_BFILE                      BINARY FILE LOB         IN    
+ AMOUNT                         NUMBER(38)              IN    
+ DEST_OFFSET                    NUMBER(38)              IN/OUT
+ SRC_OFFSET                     NUMBER(38)              IN/OUT
+PROCEDURE LOADCLOBFROMFILE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       CLOB                    IN/OUT
+ SRC_BFILE                      BINARY FILE LOB         IN    
+ AMOUNT                         NUMBER(38)              IN    
+ DEST_OFFSET                    NUMBER(38)              IN/OUT
+ SRC_OFFSET                     NUMBER(38)              IN/OUT
+ BFILE_CSID                     NUMBER                  IN    
+ LANG_CONTEXT                   NUMBER(38)              IN/OUT
+ WARNING                        NUMBER(38)              OUT   
+PROCEDURE LOADFROMFILE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       BLOB                    IN/OUT
+ SRC_LOB                        BINARY FILE LOB         IN    
+ AMOUNT                         NUMBER(38)              IN    
+ DEST_OFFSET                    NUMBER(38)              IN     DEFAULT
+ SRC_OFFSET                     NUMBER(38)              IN     DEFAULT
+PROCEDURE LOADFROMFILE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ DEST_LOB                       CLOB                    IN/OUT
+ SRC_LOB                        BINARY FILE LOB         IN    
+ AMOUNT                         NUMBER(38)              IN    
+ DEST_OFFSET                    NUMBER(38)              IN     DEFAULT
+ SRC_OFFSET                     NUMBER(38)              IN     DEFAULT
+PROCEDURE MOVE_TO_DBFS_LINK
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ STORAGE_PATH                   VARCHAR2                IN    
+ FLAGS                          BINARY_INTEGER          IN     DEFAULT
+PROCEDURE MOVE_TO_DBFS_LINK
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ STORAGE_PATH                   VARCHAR2                IN    
+ FLAGS                          BINARY_INTEGER          IN     DEFAULT
+PROCEDURE OPEN
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ OPEN_MODE                      BINARY_INTEGER          IN    
+PROCEDURE OPEN
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ OPEN_MODE                      BINARY_INTEGER          IN    
+PROCEDURE OPEN
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN/OUT
+ OPEN_MODE                      BINARY_INTEGER          IN     DEFAULT
+PROCEDURE READ
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+ AMOUNT                         NUMBER(38)              IN/OUT
+ OFFSET                         NUMBER(38)              IN    
+ BUFFER                         RAW                     OUT   
+PROCEDURE READ
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+ AMOUNT                         NUMBER(38)              IN/OUT
+ OFFSET                         NUMBER(38)              IN    
+ BUFFER                         VARCHAR2                OUT   
+PROCEDURE READ
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN    
+ AMOUNT                         NUMBER(38)              IN/OUT
+ OFFSET                         NUMBER(38)              IN    
+ BUFFER                         RAW                     OUT   
+PROCEDURE SETCONTENTTYPE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ CONTENTTYPE                    VARCHAR2                IN    
+PROCEDURE SETCONTENTTYPE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ CONTENTTYPE                    VARCHAR2                IN    
+PROCEDURE SETOPTIONS
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ OPTION_TYPES                   BINARY_INTEGER          IN    
+ OPTIONS                        BINARY_INTEGER          IN    
+PROCEDURE SETOPTIONS
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ OPTION_TYPES                   BINARY_INTEGER          IN    
+ OPTIONS                        BINARY_INTEGER          IN    
+PROCEDURE SET_DBFS_LINK
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ STORAGE_PATH                   VARCHAR2                IN    
+PROCEDURE SET_DBFS_LINK
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ STORAGE_PATH                   VARCHAR2                IN    
+FUNCTION SUBSTR RETURNS RAW
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN    
+ AMOUNT                         NUMBER(38)              IN     DEFAULT
+ OFFSET                         NUMBER(38)              IN     DEFAULT
+FUNCTION SUBSTR RETURNS VARCHAR2
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN    
+ AMOUNT                         NUMBER(38)              IN     DEFAULT
+ OFFSET                         NUMBER(38)              IN     DEFAULT
+FUNCTION SUBSTR RETURNS RAW
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ FILE_LOC                       BINARY FILE LOB         IN    
+ AMOUNT                         NUMBER(38)              IN     DEFAULT
+ OFFSET                         NUMBER(38)              IN     DEFAULT
+PROCEDURE TRIM
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ NEWLEN                         NUMBER(38)              IN    
+PROCEDURE TRIM
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ NEWLEN                         NUMBER(38)              IN    
+PROCEDURE WRITE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN    
+ OFFSET                         NUMBER(38)              IN    
+ BUFFER                         RAW                     IN    
+PROCEDURE WRITE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN    
+ OFFSET                         NUMBER(38)              IN    
+ BUFFER                         VARCHAR2                IN    
+PROCEDURE WRITEAPPEND
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        BLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN    
+ BUFFER                         RAW                     IN    
+PROCEDURE WRITEAPPEND
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ LOB_LOC                        CLOB                    IN/OUT
+ AMOUNT                         NUMBER(38)              IN    
+ BUFFER                         VARCHAR2                IN    
+
+JKSTILL@ora192rac-scan/pdb1.jks.com % spool off

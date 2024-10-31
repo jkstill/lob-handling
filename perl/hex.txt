@@ -1,0 +1,14 @@
+JKSTILL@ora192rac-scan/pdb1.jks.com % select c1 from blobtest;
+
+Thu May 23                                                                                                                                                                                     page    1
+                                                                                             NLS PARAMETERS
+
+C1
+--------------------------------------------------------------------------------
+232425262728292A2B2C2D2E2F303132333435363738393A3B3C3D3E3F40414243444546474849
+4A4B4C4D4E4F5051525354
+
+
+1 row selected.
+
+JKSTILL@ora192rac-scan/pdb1.jks.com % spool off

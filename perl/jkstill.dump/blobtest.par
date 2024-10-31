@@ -1,0 +1,4 @@
+userid = jkstill/grok@lestrade/pdb01
+control = blobtest.ctl
+log = blobtest.log
+bad = blobtest.bad
