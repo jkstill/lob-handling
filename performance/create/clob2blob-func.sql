@@ -1,4 +1,10 @@
 
+ALTER SESSION SET plsql_code_type = 'INTERPRETED';
+--ALTER SESSION SET plsql_code_type = 'NATIVE';
+-- tread compiling DBMS_LOB native
+-- that succeeded, but attempting to use it cause ORA-07445
+-- setting this to NATIVE has little affect, as expected
+
 create or replace
 function clob2blob (sourceClob clob) return blob deterministic
 as
@@ -49,5 +55,7 @@ The two possible values for the warning parameter are:
 
 end;
 /
+
+--ALTER SESSION SET plsql_code_type = 'INTERPRETED';
 
 

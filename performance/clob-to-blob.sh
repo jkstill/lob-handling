@@ -7,6 +7,7 @@ echo
 source ./setenv.sh
 
 time ./clob-to-blob-range.pl --database $ezName --username jkstill --password grok \
+	--nouse-function \
 	--table blobdest \
 	--clob c1 \
 	--blob b1 \
@@ -20,6 +21,7 @@ echo Run the conversion
 echo 
 
 time ./clob-to-blob-range.pl --database $ezName --username jkstill --password grok \
+	--nouse-function \
 	--table blobdest \
 	--clob c1 \
 	--blob b1 \

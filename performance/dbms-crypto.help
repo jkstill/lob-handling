@@ -1,0 +1,449 @@
+JKSTILL@ora192rac-scan/pdb1.jks.com % /
+                                                                                                           SOURCE FOR PACKAGE - sys.DBMS_CRYPTO
+   LINE TEXT
+------- --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      1 PACKAGE DBMS_CRYPTO AS
+      2
+      3     ---------------------------------------------------------------------------
+      4     --
+      5     -- PACKAGE NOTES
+      6     --
+      7     -- DBMS_CRYPTO contains basic cryptographic functions and
+      8     -- procedures.  To use correctly and securely, a general level of
+      9     -- security expertise is assumed.
+     10     --
+     11     -- VARCHAR2 datatype is not supported.  Cryptographic operations
+     12     -- on this type should be prefaced with conversions to a uniform
+     13     -- character set (AL32UTF8) and conversion to RAW type.
+     14     --
+     15     -- Prior to encryption, hashing or keyed hashing, CLOB datatype is
+     16     -- converted to AL32UTF8.  This allows cryptographic data to be
+     17     -- transferred and understood between databases with different
+     18     -- character sets, across character set changes and between
+     19     -- separate processes (for example, Java programs).
+     20     --
+     21     ---------------------------------------------------------------------------
+     22
+     23
+     24     -------------------------- ALGORITHM CONSTANTS ----------------------------
+     25     -- The following constants refer to various types of cryptographic
+     26     -- functions available from this package.  Some of the constants
+     27     -- represent modifiers to these algorithms.
+     28     ---------------------------------------------------------------------------
+     29
+     30     -- Hash Functions
+     31     HASH_MD4           CONSTANT PLS_INTEGER            :=     1;
+     32     HASH_MD5           CONSTANT PLS_INTEGER            :=     2;
+     33     HASH_SH1           CONSTANT PLS_INTEGER            :=     3;
+     34     HASH_SH256         CONSTANT PLS_INTEGER            :=     4;
+     35     HASH_SH384         CONSTANT PLS_INTEGER            :=     5;
+     36     HASH_SH512         CONSTANT PLS_INTEGER            :=     6;
+     37
+     38     -- MAC Functions
+     39     HMAC_MD5           CONSTANT PLS_INTEGER            :=     1;
+     40     HMAC_SH1           CONSTANT PLS_INTEGER            :=     2;
+     41     HMAC_SH256         CONSTANT PLS_INTEGER            :=     3;
+     42     HMAC_SH384         CONSTANT PLS_INTEGER            :=     4;
+     43     HMAC_SH512         CONSTANT PLS_INTEGER            :=     5;
+     44
+     45     -- Block Cipher Algorithms
+     46     ENCRYPT_DES        CONSTANT PLS_INTEGER            :=     1;  -- 0x0001
+     47     ENCRYPT_3DES_2KEY  CONSTANT PLS_INTEGER            :=     2;  -- 0x0002
+     48     ENCRYPT_3DES       CONSTANT PLS_INTEGER            :=     3;  -- 0x0003
+     49     ENCRYPT_AES        CONSTANT PLS_INTEGER            :=     4;  -- 0x0004
+     50     ENCRYPT_PBE_MD5DES CONSTANT PLS_INTEGER            :=     5;  -- 0x0005
+     51     ENCRYPT_AES128     CONSTANT PLS_INTEGER            :=     6;  -- 0x0006
+     52     ENCRYPT_AES192     CONSTANT PLS_INTEGER            :=     7;  -- 0x0007
+     53     ENCRYPT_AES256     CONSTANT PLS_INTEGER            :=     8;  -- 0x0008
+     54
+     55     -- Block Cipher Chaining Modifiers
+     56     CHAIN_CBC          CONSTANT PLS_INTEGER            :=   256;  -- 0x0100
+     57     CHAIN_CFB          CONSTANT PLS_INTEGER            :=   512;  -- 0x0200
+     58     CHAIN_ECB          CONSTANT PLS_INTEGER            :=   768;  -- 0x0300
+     59     CHAIN_OFB          CONSTANT PLS_INTEGER            :=  1024;  -- 0x0400
+     60
+     61     -- Block Cipher Padding Modifiers
+     62     PAD_PKCS5          CONSTANT PLS_INTEGER            :=  4096;  -- 0x1000
+     63     PAD_NONE           CONSTANT PLS_INTEGER            :=  8192;  -- 0x2000
+     64     PAD_ZERO           CONSTANT PLS_INTEGER            := 12288;  -- 0x3000
+     65     PAD_ORCL           CONSTANT PLS_INTEGER            := 16384;  -- 0x4000
+     66
+     67     -- Stream Cipher Algorithms
+     68     ENCRYPT_RC4        CONSTANT PLS_INTEGER            :=   129;  -- 0x0081
+     69
+     70
+     71     -- Convenience Constants for Block Ciphers
+     72     DES_CBC_PKCS5      CONSTANT PLS_INTEGER            := ENCRYPT_DES
+     73                                                           + CHAIN_CBC
+     74                                                           + PAD_PKCS5;
+     75
+     76     DES3_CBC_PKCS5     CONSTANT PLS_INTEGER            := ENCRYPT_3DES
+     77                                                           + CHAIN_CBC
+     78                                                           + PAD_PKCS5;
+     79
+     80     AES_CBC_PKCS5      CONSTANT PLS_INTEGER            := ENCRYPT_AES
+     81                                                           + CHAIN_CBC
+     82                                                           + PAD_PKCS5;
+     83
+     84     -- Public Key Encryption Algorithm
+     85     PKENCRYPT_RSA_PKCS1_OAEP   CONSTANT PLS_INTEGER   := 1;
+     86
+     87     -- Public Key Type Algorithm
+     88     KEY_TYPE_RSA               CONSTANT PLS_INTEGER   := 1;
+     89
+     90     -- Public Key Signature Type Algorithm
+     91     SIGN_SHA1_RSA              CONSTANT PLS_INTEGER   := 1;
+     92     SIGN_MD2_RSA               CONSTANT PLS_INTEGER   := 2;
+     93     SIGN_MD5_RSA               CONSTANT PLS_INTEGER   := 3;
+     94     SIGN_RSA_PKCS1_OAEP_SHA256 CONSTANT PLS_INTEGER   := 4;
+     95     SIGN_SHA1_RSA_X931         CONSTANT PLS_INTEGER   := 5;
+     96     SIGN_SHA224_RSA            CONSTANT PLS_INTEGER   := 6;
+     97     SIGN_SHA256_RSA            CONSTANT PLS_INTEGER   := 7;
+     98     SIGN_SHA256_RSA_X931       CONSTANT PLS_INTEGER   := 8;
+     99     SIGN_SHA384_RSA            CONSTANT PLS_INTEGER   := 9;
+    100     SIGN_SHA384_RSA_X931       CONSTANT PLS_INTEGER   := 10;
+    101     SIGN_SHA512_RSA            CONSTANT PLS_INTEGER   := 11;
+    102     SIGN_SHA512_RSA_X931       CONSTANT PLS_INTEGER   := 12;
+    103
+    104     ----------------------------- EXCEPTIONS ----------------------------------
+    105     -- Invalid Cipher Suite
+    106     CipherSuiteInvalid EXCEPTION;
+    107     PRAGMA EXCEPTION_INIT(CipherSuiteInvalid, -28827);
+    108
+    109     -- Null Cipher Suite
+    110     CipherSuiteNull EXCEPTION;
+    111     PRAGMA EXCEPTION_INIT(CipherSuiteNull,    -28829);
+    112
+    113     -- Key Null
+    114     KeyNull EXCEPTION;
+    115     PRAGMA EXCEPTION_INIT(KeyNull,            -28239);
+    116
+    117     -- Key Bad Size
+    118     KeyBadSize EXCEPTION;
+    119     PRAGMA EXCEPTION_INIT(KeyBadSize,         -28234);
+    120
+    121     -- Double Encryption
+    122     DoubleEncryption EXCEPTION;
+    123     PRAGMA EXCEPTION_INIT(DoubleEncryption,   -28233);
+    124
+    125
+    126     ---------------------- FUNCTIONS AND PROCEDURES ------------------------
+    127
+    128     ------------------------------------------------------------------------
+    129     --
+    130     -- NAME:  Encrypt
+    131     --
+    132     -- DESCRIPTION:
+    133     --
+    134     --   Encrypt plain text data using stream or block cipher with user
+    135     --   supplied key and optional iv.
+    136     --
+    137     -- PARAMETERS
+    138     --
+    139     --   plaintext   - Plaintext data to be encrypted
+    140     --   crypto_type - Stream or block cipher type plus modifiers
+    141     --   key         - Key to be used for encryption
+    142     --   iv          - Optional IV for block ciphers.  Default all zeros.
+    143     --
+    144     -- USAGE NOTES:
+    145     --
+    146     --   Block ciphers may be modified with chaining type (CBC most
+    147     --   common) and padding type (PKCS5 recommended).  Of the four
+    148     --   common data formats, three have been provided: RAW, BLOB,
+    149     --   CLOB. For VARCHAR2 encryption, callers should first convert
+    150     --   to AL32UTF8 character set and then encrypt.
+    151     --
+    152     --     Encrypt(UTL_RAW.CAST_TO_RAW(CONVERT(src,'AL32UTF8')),typ,key);
+    153     --
+    154     --   As return type for encrypt is RAW, callers should consider
+    155     --   encoding it with RAWTOHEX or UTL_ENCODE.BASE64_ENCODE to make
+    156     --   it suitable for VARCHAR2 storage.  These functions expand
+    157     --   data size by 2 and 4/3, respectively.
+    158     --
+    159     --   To improve readability, callers should define their own
+    160     --   package level constants to represent the ciphersuites used
+    161     --   for encryption and decryption.
+    162     --
+    163     --   For example:
+    164     --
+    165     --   DES_CBC_PKCS5 CONSTANT PLS_INTEGER := DBMS_CRYPTO.ENCRYPT_DES
+    166     --                                       + DBMS_CRYPTO.CHAIN_CBC
+    167     --                                       + DBMS_CRYPTO.PAD_PKCS5;
+    168     --
+    169     --
+    170     -- STREAM CIPHERS (RC4) ARE NOT RECOMMENDED FOR STORED DATA ENCRYPTION.
+    171     --
+    172     --
+    173     ------------------------------------------------------------------------
+    174
+    175     FUNCTION  Encrypt (src IN            RAW,
+    176                        typ IN            PLS_INTEGER,
+    177                        key IN            RAW,
+    178                        iv  IN            RAW          DEFAULT NULL)
+    179       RETURN RAW;
+    180
+    181     PROCEDURE Encrypt (dst IN OUT NOCOPY BLOB,
+    182                        src IN            BLOB,
+    183                        typ IN            PLS_INTEGER,
+    184                        key IN            RAW,
+    185                        iv  IN            RAW          DEFAULT NULL);
+    186
+    187     PROCEDURE Encrypt (dst IN OUT NOCOPY BLOB,
+    188                        src IN            CLOB         CHARACTER SET ANY_CS,
+    189                        typ IN            PLS_INTEGER,
+    190                        key IN            RAW,
+    191                        iv  IN            RAW          DEFAULT NULL);
+    192
+    193
+    194     ------------------------------------------------------------------------
+    195     --
+    196     -- NAME:  Decrypt
+    197     --
+    198     -- DESCRIPTION:
+    199     --
+    200     --   Decrypt crypt text data using stream or block cipher with user
+    201     --   supplied key and optional iv.
+    202     --
+    203     -- PARAMETERS
+    204     --
+    205     --   cryptext    - Crypt text data to be decrypted
+    206     --   crypto_type - Stream or block cipher type plus modifiers
+    207     --   key         - Key to be used for encryption
+    208     --   iv          - Optional IV for block ciphers.  Default all zeros.
+    209     --
+    210     -- USAGE NOTES:
+    211     --   To retrieve original plain text data, Decrypt must be called
+    212     --   with the same cipher, modifiers, key and iv used for
+    213     --   encryption.  If crypt text data was converted to hex or
+    214     --   base64 prior to storage, it must be decoded using HEXTORAW or
+    215     --   UTL_ENCODE.BASE64_DECODE prior to decryption.
+    216     --
+    217     ------------------------------------------------------------------------
+    218
+    219     FUNCTION  Decrypt (src IN            RAW,
+    220                        typ IN            PLS_INTEGER,
+    221                        key IN            RAW,
+    222                        iv  IN            RAW          DEFAULT NULL)
+    223        RETURN RAW;
+    224
+    225     PROCEDURE Decrypt (dst IN OUT NOCOPY BLOB,
+    226                        src IN            BLOB,
+    227                        typ IN            PLS_INTEGER,
+    228                        key IN            RAW,
+    229                        iv  IN            RAW          DEFAULT NULL);
+    230
+    231     PROCEDURE Decrypt (dst IN OUT NOCOPY CLOB         CHARACTER SET ANY_CS,
+    232                        src IN            BLOB,
+    233                        typ IN            PLS_INTEGER,
+    234                        key IN            RAW,
+    235                        iv  IN            RAW          DEFAULT NULL);
+    236
+    237
+    238     ------------------------------------------------------------------------
+    239     --
+    240     -- NAME:  Hash
+    241     --
+    242     -- DESCRIPTION:
+    243     --
+    244     --   Hash source data by cryptographic hash type.
+    245     --
+    246     -- PARAMETERS
+    247     --
+    248     --   source    - Source data to be hashed
+    249     --   hash_type - Hash algorithm to be used
+    250     --
+    251     -- USAGE NOTES:
+    252     --   SHA-1 (HASH_SH1) is recommended.  Consider encoding returned
+    253     --   raw value to hex or base64 prior to storage.
+    254     --
+    255     ------------------------------------------------------------------------
+    256
+    257     FUNCTION Hash (src IN RAW,
+    258                    typ IN PLS_INTEGER)
+    259       RETURN RAW DETERMINISTIC;
+    260
+    261     FUNCTION Hash (src IN BLOB,
+    262                    typ IN PLS_INTEGER)
+    263       RETURN RAW DETERMINISTIC;
+    264
+    265     FUNCTION Hash (src IN CLOB        CHARACTER SET ANY_CS,
+    266                    typ IN PLS_INTEGER)
+    267       RETURN RAW DETERMINISTIC;
+    268
+    269
+    270     ------------------------------------------------------------------------
+    271     --
+    272     -- NAME:  Mac
+    273     --
+    274     -- DESCRIPTION:
+    275     --
+    276     --   Message Authentication Code algorithms provide keyed message
+    277     --   protection.
+    278     --
+    279     -- PARAMETERS
+    280     --
+    281     --   source   - Source data to be mac-ed
+    282     --   mac_type - Mac algorithm to be used
+    283     --   key      - Key to be used for mac
+    284     --
+    285     -- USAGE NOTES:
+    286     --   Callers should consider encoding returned raw value to hex or
+    287     --   base64 prior to storage.
+    288     --
+    289     ------------------------------------------------------------------------
+    290     FUNCTION Mac (src IN RAW,
+    291                   typ IN PLS_INTEGER,
+    292                   key IN RAW)
+    293       RETURN RAW;
+    294
+    295     FUNCTION Mac (src IN BLOB,
+    296                   typ IN PLS_INTEGER,
+    297                   key IN RAW)
+    298       RETURN RAW;
+    299
+    300     FUNCTION Mac (src IN CLOB         CHARACTER SET ANY_CS,
+    301                   typ IN PLS_INTEGER,
+    302                   key IN RAW)
+    303       RETURN RAW;
+    304
+    305
+    306     ------------------------------------------------------------------------
+    307     --
+    308     -- NAME:  RandomBytes
+    309     --
+    310     -- DESCRIPTION:
+    311     --
+    312     --   Returns a raw value containing a pseudo-random sequence of
+    313     --   bytes.
+    314     --
+    315     -- PARAMETERS
+    316     --
+    317     --   number_bytes - Number of pseudo-random bytes to be generated.
+    318     --
+    319     -- USAGE NOTES:
+    320     --   number_bytes should not exceed maximum RAW length.
+    321     --
+    322     ------------------------------------------------------------------------
+    323     FUNCTION RandomBytes (number_bytes IN PLS_INTEGER)
+    324       RETURN RAW;
+    325
+    326
+    327     ------------------------------------------------------------------------
+    328     --
+    329     -- NAME:  RandomNumber
+    330     --
+    331     -- DESCRIPTION:
+    332     --
+    333     --   Returns a random Oracle Number.
+    334     --
+    335     -- PARAMETERS
+    336     --
+    337     --  None.
+    338     --
+    339     ------------------------------------------------------------------------
+    340     FUNCTION RandomNumber
+    341       RETURN NUMBER;
+    342
+    343
+    344     ------------------------------------------------------------------------
+    345     --
+    346     -- NAME:  RandomInteger
+    347     --
+    348     -- DESCRIPTION:
+    349     --
+    350     --   Returns a random BINARY_INTEGER.
+    351     --
+    352     -- PARAMETERS
+    353     --
+    354     --  None.
+    355     --
+    356     ------------------------------------------------------------------------
+    357     FUNCTION RandomInteger
+    358       RETURN BINARY_INTEGER;
+    359
+    360     ------------------------------------------------------------------------
+    361     --
+    362     -- NAME:  Asymmetric Key Operations
+    363     --
+    364     -- DESCRIPTION:
+    365     --
+    366     -- New API for Asymmetric Key Operations which are encrypt, decrypt,
+    367     -- sign and verify
+    368     --
+    369     -- PARAMETERS
+    370     --
+    371     --
+    372     ------------------------------------------------------------------------
+    373
+    374
+    375     FUNCTION PKENCRYPT   (src        IN            RAW,
+    376                           pub_key    IN            RAW,
+    377                           pubkey_alg IN            PLS_INTEGER,
+    378                           enc_alg    IN            PLS_INTEGER)
+    379     RETURN RAW;
+    380
+    381
+    382     FUNCTION PKDECRYPT   (src        IN            RAW,
+    383                           prv_key    IN            RAW,
+    384                           pubkey_alg IN            PLS_INTEGER,
+    385                           enc_alg    IN            PLS_INTEGER)
+    386        RETURN RAW;
+    387
+    388
+    389     FUNCTION SIGN        (src        IN            RAW,
+    390                           prv_key    IN            RAW,
+    391                           pubkey_alg IN            PLS_INTEGER,
+    392                           sign_alg   IN            PLS_INTEGER)
+    393        RETURN RAW;
+    394
+    395
+    396     FUNCTION VERIFY      (src        IN            RAW,
+    397                           sign       IN            RAW,
+    398                           pub_key    IN            RAW,
+    399                           pubkey_alg IN            PLS_INTEGER,
+    400                           sign_alg   IN            PLS_INTEGER)
+    401        RETURN BOOLEAN;
+    402
+    403
+    404     PRAGMA RESTRICT_REFERENCES(DEFAULT, WNDS, RNDS, WNPS, RNPS);
+    405
+    406 END DBMS_CRYPTO;
+      1 PACKAGE BODY dbms_crypto wrapped
+        a000000
+        1
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        abcd
+        b
+        1488 3c9
+        SYufE+d14FEuNNqrww31Dq4l6Sswg82c10oFyo4CmP9eSxNUwmD80MkaI0XdBEkWy1Sp61P9
+        GmEF5VwFLpq8cLjg4IYUSOiCOxUV95CZbk46h91sotVT3coBk7IiquSbhBCS+R4FcmSmGDF0
+        fTxxPLgKV89kNjqp++DDWlpsFplr540wN60w+Ms0PzKqv0+0h0Lp9xRf4ak+BjI+r3G4NudE
+        kOiAXxdwU/pFeuO5R2+KDRWBiMfIsn2AuyBlbmrlyKkr6fO+f1enlLAb4kJnok63BkRrP6Kn
+        4gInboKNwV08OHyO4AvR36MLYqjy7Ep1yWLFB0tddO7YBjDQfLYl58mNb5Uv1fbIb1aykh62
+        LLKqp4Vb5wdQJ3t/MKO8Wge7IKfIhBQyUudW+xoN5gaeqp9TZ5HOqqPK6GQvSmp9nu7gI4g0
+        CzBMqEDxoOkSIaFJpZCHm+rOqM75ni1G4L66pOb8pJDL8fmnEGB/7K2/jbSzEUFJC5KsZLjl
+        3dkMismK+r34xEP4krEvpNmpvN1rFurLI18k8ig7xg+w2jnSqvrj5Gmsekr5xrh8bKpBkNqa
+        HAchCx6gp1RH3g3cf+rX14mJSa2lQDClnUFd0yyh0dXU6+5dHXHn2LBskkU36QKUi24IM655
+        Sl0SjKRe+g4P2taW1CL9PkRiJdRHDWz6pzDaKAQwQh/pr5CLyRIaVaIH3IqgaitomZtj6Ebm
+        h7sizGpBxZN1H/VtDsjyE6XaQOTt9CPTTNCE8EPlc9tL6Xe5YfX1gjz9z43FXrZJ1PxpRG2V
+        vQKL7Cs99UuGDye7aL4NbH1Z26QCUtrHW4/i6mRX2VwS5Hu3HJrkt9I0KPsXBlftUCmhyOkS
+        DhIr0l/RB7us0kdN74+DodpdR4wcoLKLFGRyBzw3c12VEMWPiS3hhCM5kQzG4N8DNifPpmHN
+        JlJ4wXNzS/ptmkpvce0=
+
+
+407 rows selected.
+
+JKSTILL@ora192rac-scan/pdb1.jks.com % spool off

@@ -11,7 +11,7 @@ create/create-blobdest.sh
 
 cd jkstill.dump
 
-time sqlldr jkstill/grok@$ezName parfile=blobdest.par 
+time sqlldr jkstill/grok@$ezName parfile=blobdest.par readsize=20971520 bindsize=2097152
 
 
 

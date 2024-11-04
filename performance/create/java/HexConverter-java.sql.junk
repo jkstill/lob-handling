@@ -1,0 +1,48 @@
+
+set verify off
+
+CREATE OR REPLACE AND RESOLVE JAVA SOURCE NAMED "HexConverter" AS
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringReader;
+import java.sql.Connection;
+import java.sql.SQLException;
+import oracle.sql.BLOB;
+
+public class HexConverter {
+    private static final int DEFAULT_BUFFER_SIZE = 8192; // Default buffer size for reading
+
+    public static BLOB hexToBlob(Connection conn, String hex) throws IOException, SQLException {
+    //public static BLOB hexToBlob(String hex) throws IOException, SQLException {
+        if (hex == null || hex.isEmpty()) {
+            return BLOB.createTemporary(conn, true, BLOB.DURATION_SESSION); // Return an empty temporary BLOB
+        }
+
+        int hexLength = hex.length();
+        int bufferSize = Math.min(DEFAULT_BUFFER_SIZE, hexLength); // Set buffer size, capped by hex length
+        byte[] byteArray = new byte[hexLength / 2];
+        int byteArrayIndex = 0;
+
+        try (BufferedReader reader = new BufferedReader(new StringReader(hex), bufferSize)) {
+            char[] buffer = new char[bufferSize];
+            int charsRead;
+
+            while ((charsRead = reader.read(buffer)) != -1) {
+                for (int i = 0; i < charsRead - 1 && byteArrayIndex < byteArray.length; i += 2) {
+                    String hexByte = new String(buffer, i, 2);
+                    byteArray[byteArrayIndex++] = (byte) Integer.parseInt(hexByte, 16);
+                }
+            }
+        }
+
+        // Create a temporary BLOB and write the byte array into it
+        BLOB blob = BLOB.createTemporary(conn, true, BLOB.DURATION_SESSION);
+        blob.setBytes(1, byteArray);
+
+        return blob;
+    }
+}
+/
+
+show errors Java source HexConverter
+

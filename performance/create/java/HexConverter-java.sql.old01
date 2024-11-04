@@ -1,0 +1,38 @@
+
+CREATE OR REPLACE AND RESOLVE JAVA SOURCE NAMED "HexConverter" AS
+import oracle.sql.BLOB;
+import oracle.sql.CLOB;
+import java.io.OutputStream;
+import java.io.Reader;
+
+public class HexConverter {
+    public static BLOB hexToBlob(CLOB hexClob) throws Exception {
+        if (hexClob == null || hexClob.length() == 0) {
+            return null;
+        }
+
+        BLOB blob = BLOB.createTemporary(hexClob.getJavaSqlConnection(), true, BLOB.DURATION_SESSION);
+        try (OutputStream out = blob.setBinaryStream(1);
+             Reader reader = hexClob.getCharacterStream()) {
+
+            char[] buffer = new char[2];
+            int bytesRead;
+            while ((bytesRead = reader.read(buffer)) != -1) {
+                if (bytesRead == 2) {
+                    String hexByte = new String(buffer);
+                    int byteValue = Integer.parseInt(hexByte, 16);
+                    out.write(byteValue);
+                }
+            }
+        } catch (Exception e) {
+            blob.freeTemporary();
+            throw new Exception("Error converting hex CLOB to BLOB", e);
+        }
+
+        return blob;
+    }
+};
+/
+
+show errors Java source HexConverter
+

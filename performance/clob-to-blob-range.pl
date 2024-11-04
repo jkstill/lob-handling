@@ -18,6 +18,7 @@ my ($rangeLow, $rangeHigh);
 my $commitInterval=1000;
 my $reportInterval=50000;
 my $commitCounter=0;
+my ($useFunction,$functionName)= (0,'');
 
 
 Getopt::Long::GetOptions(
@@ -31,6 +32,8 @@ Getopt::Long::GetOptions(
 	"create-temp!" => \$createTemp,
 	"range-low=i"  => \$rangeLow,
 	"range-high=i" => \$rangeHigh,
+	"use-function!" => \$useFunction,
+	"function-name=s" => \$functionName,
 	"commit-interval=i" => \$commitInterval,
 	"report-interval=i" => \$reportInterval,
 	"sysdba!"		=> \$sysdba,
@@ -49,6 +52,12 @@ if (! $localSysdba) {
 	usage(1) unless ($db and $username and $password);
 }
 
+
+if ($useFunction) {
+	if (!$functionName) {
+		die "function-name must be specified when using --use-function\n";
+	}
+}
 
 $|=1; # flush output immediately
 
@@ -103,7 +112,19 @@ $sql=qq{select rowid, $clobColumn, nvl(length($blobColumn),0) blob_length from $
 print "CLOB SQL: $sql\n";
 
 my $sth = $dbh->prepare($sql, {ora_piece_lob=>1,ora_piece_size=> $oraPieceSize});
-my $blobUpdateSQL=qq{update $tableName set $blobColumn = ? where rowid = ?};
+
+my $blobUpdateSQL='';
+
+# must first build hex_to_blob function with hex_to_blob.sql
+if ($useFunction) {
+	#$blobUpdateSQL=qq{update $tableName set $blobColumn = hex_to_blob($clobColumn)  where rowid = ?};
+	$blobUpdateSQL=qq{update $tableName set $blobColumn = ${functionName}($clobColumn)  where rowid = ?};
+} else {
+   $blobUpdateSQL=qq{update $tableName set $blobColumn = ? where rowid = ?};
+}
+
+print "BLOB SQL: $blobUpdateSQL\n";
+
 my $updateSTH = $dbh->prepare($blobUpdateSQL, {ora_piece_lob=>1,ora_piece_size=> $oraPieceSize});
 
 # loop through rowids from the TEMP table
@@ -114,13 +135,31 @@ while ( my ($id,$rowid) = $rowidSTH->fetchrow_array() ) {
 	my ($id, $clob,$blobLength) = $sth->fetchrow_array();
 	next if $blobLength;  # already converted - may have stopped and run again
 	next unless $clob; # CLOB is empty
-	my $raw = pack"H*",$clob;
-	#print " raw len: " . length($raw) . "\n";
 
-	#$updateSTH->bind_param(1,$raw,{ora_type=>SQLT_BIN});
-	$updateSTH->bind_param(1,$raw,{ora_type=>ORA_BLOB});
-	$updateSTH->bind_param(2,$rowid,{ora_type=>SQLT_CHR});
-	$updateSTH->execute();
+	if ($useFunction) {
+		$updateSTH->bind_param(1,$rowid,{ora_type=>SQLT_CHR});
+	} else {
+		my $raw = pack"H*",$clob;
+		#print " raw len: " . length($raw) . "\n";
+		$updateSTH->bind_param(1,$raw,{ora_type=>ORA_BLOB});
+		$updateSTH->bind_param(2,$rowid,{ora_type=>SQLT_CHR});
+	}
+
+	eval {
+		local $dbh->{RaiseError} = 1;
+		local $dbh->{PrintError} = 0;
+		$updateSTH->execute();
+	};
+
+	if ($@) {
+		my($err,$errStr) = ($dbh->err, $dbh->errstr);
+		warn "query died - $err - $errStr\n";
+		warn "rowid: $rowid\n";
+		warn "id: $id\n";
+		warn "blobLength: $blobLength\n";
+		warn "updateSQL: $blobUpdateSQL\n";
+		warn "useFunction: $useFunction\n";
+	}
 
 	#$dbh->do(qq);
 
@@ -160,6 +199,12 @@ usage: $basename
 
   --range-low         ID from the temp table to start with
   --range-high        ID from the temp table to end with
+
+  --use-function      use the clob2blob function to convert CLOB to BLOB
+  --nouse-function    use Perl to read CLOB and write BLOB (default)
+  --function-name     name of the function to use
+                      Examples: clob2blob, hex_to_blob, hex_to_blob_java
+
   --commit-interval   number of rows process per COMMIT
   --report-interval   number of rows process per report
 
