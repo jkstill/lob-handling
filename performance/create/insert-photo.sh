@@ -15,7 +15,7 @@ source ./setenv.sh
 #./insert-photo.pl --insert-as-clob --truncate --database $ezName --username jkstill --password grok --input-file $kittyPic
 ./insert-photo.pl --truncate --database $ezName --username jkstill --password grok --input-file $kittyPic
 
-for i in {1..9}
+for i in {1..999}
 do
 	./insert-photo.pl --database $ezName --username jkstill --password grok --input-file $kittyPic
 done

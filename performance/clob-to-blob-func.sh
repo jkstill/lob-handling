@@ -40,7 +40,7 @@ declare functionName=$1
 : ${functionName:?'You must provide a function name'}
 
 case $functionName in
-	clob2blob|hex_to_blob|hex_to_blob_java)
+	clob2blob|hex_to_blob|hex_to_blob_java|clob_to_blob_java)
 		;;
 	*)
 		echo "Invalid function name: $functionName"

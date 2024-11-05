@@ -141,7 +141,6 @@ The hex_to_blob function is used to convert the hex data to binary.
 
 #### Create the clob2clob function
 
-
 This is a wrapper to dbms_lob.converttoblob and does not convert the CLOB to a binary BLOB.
 Doing so would require additional code.
 As it is not any faster than the hex_to_blob function, or Perl pack(), there is no point in extending it.
@@ -150,7 +149,7 @@ As it is not any faster than the hex_to_blob function, or Perl pack(), there is 
 @create/clob2blob-func.sql
 ```
 
-#### Create the Java function hexToBlob
+#### Create the Java function hexToBlob and PL/SQL wrapper function hex_to_blob_java
 
 This works, but is quite a bit slower than both the PL/SQL function hex_to_blob and the Perl pack() method.
 
@@ -158,6 +157,21 @@ This works, but is quite a bit slower than both the PL/SQL function hex_to_blob 
 @create/java/HexConverter-java.sql
 @create/java/hex-to-blob.sql
 ```
+
+#### Create the Java function clobToBlob2 and PL/SQL wrapper function clob_to_blob_java
+
+This Java Stored Procedure accepts tablename, clob and blob column names, and the rowid as arguments.
+
+It then converts the CLOB to BLOB and updates the table.
+
+Like the other Java function, it is too slow.
+
+
+```sql
+@create/java/HexConverter-java-02.sql
+@create/java/hex-to-blob-02.sql
+```
+
 
 #### blobdest.par
 

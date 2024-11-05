@@ -117,8 +117,11 @@ my $blobUpdateSQL='';
 
 # must first build hex_to_blob function with hex_to_blob.sql
 if ($useFunction) {
-	#$blobUpdateSQL=qq{update $tableName set $blobColumn = hex_to_blob($clobColumn)  where rowid = ?};
-	$blobUpdateSQL=qq{update $tableName set $blobColumn = ${functionName}($clobColumn)  where rowid = ?};
+	if ($functionName eq 'clob_to_blob_java' ) {
+		$blobUpdateSQL=qq{begin $functionName(?,?,?,?); end;};
+	} else {
+		$blobUpdateSQL=qq{update $tableName set $blobColumn = ${functionName}($clobColumn)  where rowid = ?};
+	}
 } else {
    $blobUpdateSQL=qq{update $tableName set $blobColumn = ? where rowid = ?};
 }
@@ -137,7 +140,14 @@ while ( my ($id,$rowid) = $rowidSTH->fetchrow_array() ) {
 	next unless $clob; # CLOB is empty
 
 	if ($useFunction) {
-		$updateSTH->bind_param(1,$rowid,{ora_type=>SQLT_CHR});
+		if ($functionName eq 'clob_to_blob_java') {
+			$updateSTH->bind_param(1,$tableName,{ora_type=>SQLT_CHR});
+			$updateSTH->bind_param(2,$clobColumn,{ora_type=>SQLT_CHR});
+			$updateSTH->bind_param(3,$blobColumn,{ora_type=>SQLT_CHR});
+			$updateSTH->bind_param(4,$rowid,{ora_type=>SQLT_CHR});
+		} else {
+			$updateSTH->bind_param(1,$rowid,{ora_type=>SQLT_CHR});
+		}
 	} else {
 		my $raw = pack"H*",$clob;
 		#print " raw len: " . length($raw) . "\n";
