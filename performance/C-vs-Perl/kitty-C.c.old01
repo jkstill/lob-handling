@@ -1,0 +1,122 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#define INPUT_FILE "kitty.hex"
+#define OUTPUT_FILE "kitty-C.jpg"
+
+// Function to convert a single hex character to its numerical value
+unsigned char hex_char_to_value(char c) {
+    if (c >= '0' && c <= '9')
+        return (unsigned char)(c - '0');
+    else if (c >= 'a' && c <= 'f')
+        return (unsigned char)(c - 'a' + 10);
+    else if (c >= 'A' && c <= 'F')
+        return (unsigned char)(c - 'A' + 10);
+    else {
+        fprintf(stderr, "Invalid hex character: %c\n", c);
+        exit(EXIT_FAILURE);
+    }
+}
+
+int main() {
+    FILE *in_fp = fopen(INPUT_FILE, "r");
+    if (in_fp == NULL) {
+        perror("Cannot open input file");
+        exit(EXIT_FAILURE);
+    }
+
+    // Determine the file size
+    fseek(in_fp, 0, SEEK_END);
+    long file_size = ftell(in_fp);
+    fseek(in_fp, 0, SEEK_SET);
+
+    // Allocate buffer for hex data
+    char *hex_data = (char *)malloc(file_size + 1);
+    if (hex_data == NULL) {
+        perror("Memory allocation failed");
+        fclose(in_fp);
+        exit(EXIT_FAILURE);
+    }
+
+    // Read the hex data
+    size_t read_size = fread(hex_data, 1, file_size, in_fp);
+    fclose(in_fp);
+    hex_data[read_size] = '\0';
+
+    // Remove any whitespace from the hex data
+    char *hex_ptr = hex_data;
+    char *clean_hex_data = (char *)malloc(file_size + 1);
+    if (clean_hex_data == NULL) {
+        perror("Memory allocation failed");
+        free(hex_data);
+        exit(EXIT_FAILURE);
+    }
+    char *clean_ptr = clean_hex_data;
+    while (*hex_ptr) {
+        if (!isspace((unsigned char)*hex_ptr)) {
+            *clean_ptr++ = *hex_ptr;
+        }
+        hex_ptr++;
+    }
+    *clean_ptr = '\0';
+
+    // Calculate binary data size
+    size_t hex_length = strlen(clean_hex_data);
+    if (hex_length % 2 != 0) {
+        fprintf(stderr, "Hex data length is not even.\n");
+        free(hex_data);
+        free(clean_hex_data);
+        exit(EXIT_FAILURE);
+    }
+    size_t binary_size = hex_length / 2;
+
+    // Allocate buffer for binary data
+    unsigned char *binary_data = (unsigned char *)malloc(binary_size);
+    if (binary_data == NULL) {
+        perror("Memory allocation failed");
+        free(hex_data);
+        free(clean_hex_data);
+        exit(EXIT_FAILURE);
+    }
+
+    // Convert hex to binary
+	 int total_iterations = 0;
+	 for (int n = 0; n < 10240; n++) {
+
+    	for (size_t i = 0; i < binary_size; i++) {
+        	unsigned char high_nibble = hex_char_to_value(clean_hex_data[2 * i]);
+        	unsigned char low_nibble = hex_char_to_value(clean_hex_data[2 * i + 1]);
+        	binary_data[i] = (high_nibble << 4) | low_nibble;
+    	}
+
+		total_iterations++;
+	 }
+
+	 printf("Total iterations: %d\n", total_iterations);
+
+    // Write binary data to output file
+    FILE *out_fp = fopen(OUTPUT_FILE, "wb");
+    if (out_fp == NULL) {
+        perror("Cannot open output file");
+        free(hex_data);
+        free(clean_hex_data);
+        free(binary_data);
+        exit(EXIT_FAILURE);
+    }
+
+    fwrite(binary_data, 1, binary_size, out_fp);
+    fclose(out_fp);
+
+    // Clean up
+    free(hex_data);
+    free(clean_hex_data);
+    free(binary_data);
+
+    printf("Conversion completed successfully.\n");
+
+    return 0;
+}
+
+

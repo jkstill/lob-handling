@@ -1,0 +1,70 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Inline C => <<'END_C';
+
+// Function to convert hex string to binary data
+/*
+void hex_to_binary(const char *hex_data, size_t hex_length, unsigned char *binary_data) {
+    if (hex_length % 2 != 0) {
+        fprintf(stderr, "Hex data length is not even.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (size_t i = 0; i < hex_length / 2; i++) {
+		  //fprintf(stderr, "hex_data: %c ", hex_data[2 * i]);
+        unsigned char high_nibble = hex_char_to_value(hex_data[2 * i]);
+		  //fprintf(stderr, "%c\n", hex_data[2 * i + 1]);
+        unsigned char low_nibble = hex_char_to_value(hex_data[2 * i + 1]);
+        binary_data[i] = (high_nibble << 4) | low_nibble;
+    }
+}
+
+*/
+
+void hex_to_binary(const char *hex_data, size_t hex_length, unsigned char *binary_data) {
+
+    // Convert hex to binary
+    for (int i = 0, j = 0; i < hex_length; i++) {
+        sscanf((char *)hex_data[j], "%2hhx", binary_data[i]);
+        j += 2;
+    }
+
+}
+
+
+END_C
+
+
+# Input and output file paths
+my $input_file  = 'kitty.hex';
+my $output_file = 'kitty-perl.jpg';
+
+# Read the hex data from the input file
+open(my $in_fh, '<', $input_file) or die "Cannot open $input_file: $!";
+local $/;  # Enable 'slurp' mode to read the entire file
+my $hex_data = <$in_fh>;
+close($in_fh);
+
+# Remove any whitespace (optional, if your hex data contains spaces or newlines)
+#$hex_data =~ s/\s+//g;
+
+# Convert hex data to binary data
+my $binary_data='';
+
+#for ( my $i = 0; $i < 2; $i++ ) {
+	#$binary_data = pack("H*", $hex_data);
+	hex_to_binary($hex_data, length($hex_data), $binary_data);
+	#}
+
+
+# Write the binary data to the output file
+open(my $out_fh, '>', $output_file) or die "Cannot open $output_file: $!";
+binmode($out_fh);  # Ensure we're writing binary data
+print $out_fh $binary_data;
+close($out_fh);
+
+print "Conversion completed successfully.\n";
+
