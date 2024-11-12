@@ -7,7 +7,14 @@ Revert hex dump to binary
 
  xxd -r -p kitty.hex > kitty-from-hex.jpg
 
+Get the first 32 bytes
+
+ xxd -p kitty-from-clob.jpg | tr -d '\n'  |  perl -p -e '$_=substr($_,0,32)'
+
+Compile 
+
 gcc -O2 -o kitty-C kitty-C.c
+
 
 ## Comparison
 

@@ -94,6 +94,11 @@ Modify the perl to use the `DBMS_LOB.CONVERTTOBLOB` procedure.
 
 Currently the Perl script reads the CLOB into a variable and converts it to to binary with  pack(), then saves to the database.
 
+### Method 4 - use C 
+
+Use C to convert the CLOB to BLOB.
+see blob.c
+
 ### Method to use
 
 The most likely method to use is the PL/SQL wrapper function that calls `DBMS_LOB.CONVERTTOBLOB`.
@@ -458,6 +463,25 @@ That is 0.17 seconds per row for the PL/SQL function, and 0.054 seconds per row 
 Wnen run on the database directly, 35.7 rows per second were processed, or about 0.028 seconds per row.
 
 
+### clob-to-blob-inline.sh
+
+
+### C clob to blob
+
+The C program is about 2x faster than the Perl pack() method.
+
+```
+[oracle@lestrade demo]$ time ./blob
+starting
+
+1000 row(s) fetched
+Error occurred at OcilibEnvironmentCleanup: Found 999 non freed OCI descriptors
+Error occurred at OcilibEnvironmentCleanup: Found 39960 non freed allocated bytes
+
+real	0m27.456s
+user	0m11.928s
+sys	0m1.293s
+```
 
 ## Conclusion
 
