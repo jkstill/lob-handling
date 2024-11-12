@@ -1,12 +1,8 @@
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <wchar.h>
-
 #include "ocilib.h"
 #include "clob-to-blob.h"
+#include "base16_decoding_table.h"
+#include <inttypes.h>
 
 #define DATA_SIZE_BUF 8 * 1048576
 #define DEBUG 0
@@ -62,6 +58,39 @@ int hex_to_binary(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *binary_d
     free(binary_char_data);
     return 1;
 }
+
+int hex_to_binary_new(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *binary_data) {
+    size_t n;
+    unsigned int hl = (*hex_length);
+
+    unsigned char *binary_char_data = (unsigned char *)malloc(DATA_SIZE_BUF);
+    char hex_char_data[DATA_SIZE_BUF+1];
+
+    n = OCI_LobRead(hex_data, hex_char_data, hl);
+    if (n % 2 != 0) {
+        fprintf(stderr, "Hex data length is not even.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    size_t i;
+    uint16_t *cur;
+    unsigned char val;
+    for (i = 0; i < n; i+=2) {
+        cur = (uint16_t*)(hex_char_data+i);
+        // apply bitmask to make sure that the first bit is zero
+        val = base16_decoding_table2[*cur & 0x7fff];
+        binary_char_data[i/2] = val;
+    }
+
+
+    OCI_LobTruncate(binary_data, 0);
+    OCI_LobSeek(binary_data, 0, OCI_SEEK_SET);
+    OCI_LobAppend(binary_data, binary_char_data, n / 2);
+
+    free(binary_char_data);
+    return 1;
+}
+
 
 void err_handler(OCI_Error *err)
 {
@@ -123,7 +152,7 @@ int main(int argc, oarg* argv[])
 	stBlob = OCI_StatementCreate(cn);
 	stUpd = OCI_StatementCreate(cn);
 
-	OCI_ExecuteStmt(st, "select id, row_id from blobdest_rows where rownum < 11");
+	OCI_ExecuteStmt(st, "select id, row_id from blobdest_rows where rownum < 101");
 
 	rs = OCI_GetResultset(st);
 
@@ -149,7 +178,7 @@ int main(int argc, oarg* argv[])
 			unsigned int srcLobLen = OCI_LobGetLength(lob1);
 
 			OCI_LobSeek(lob1, 0, OCI_SEEK_SET );
-			char retVal = hex_to_binary(lob1, &srcLobLen, lob2);
+			char retVal = hex_to_binary_new(lob1, &srcLobLen, lob2);
 			if (retVal == '~' ) {
 				fprintf( stderr, "Error converting Hex to Binary\n");
 				break;
