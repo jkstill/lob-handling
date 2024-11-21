@@ -12,6 +12,15 @@ $  gcc -o hex-to-bin-tests hex-to-bin-tests.c
 
 ```
 
+Additional optimized hex to binary conversions test6() using SIMD with help from ChatGTP
+
+Compile:
+
+$  gcc -msse2 -O3 -o hex-to-bin-tests-new hex-to-bin-tests-new.c
+
+
+
+
 Tests:
 
 ```text

@@ -26,7 +26,7 @@ banner () {
 
 banner "CLOB to BLOB conversion with PL/SQL function"
 ./reset.sh
-./clob-to-blob-func.sh clob2blob
+./clob-to-blob-func.sh hex_to_blob
 
 banner "CLOB to BLOB conversion with inline function"
 ./reset.sh

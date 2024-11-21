@@ -382,7 +382,7 @@ That is better than expected.
 Run directly on the server:
 
 ```
-]$ ./clob-to-blob-func.sh
+$ ./clob-to-blob-func.sh
 
 create the TEMP table
 
@@ -471,9 +471,6 @@ Wnen run on the database directly, 35.7 rows per second were processed, or about
 The C program is about 2x faster than the Perl pack() method.
 
 ```
-[oracle@lestrade demo]$ time ./blob
-starting
-
 1000 row(s) fetched
 Error occurred at OcilibEnvironmentCleanup: Found 999 non freed OCI descriptors
 Error occurred at OcilibEnvironmentCleanup: Found 39960 non freed allocated bytes
@@ -481,6 +478,16 @@ Error occurred at OcilibEnvironmentCleanup: Found 39960 non freed allocated byte
 real	0m27.456s
 user	0m11.928s
 sys	0m1.293s
+
+[oracle@lestrade demo]$ time ./clob-to-blob lestrade/pdb01 jkstill grok
+starting
+
+1000 row(s) updated
+
+real	0m19.567s
+user	0m5.666s
+sys	0m1.076s
+
 ```
 
 ## Conclusion

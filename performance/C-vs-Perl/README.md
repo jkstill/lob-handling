@@ -48,5 +48,15 @@ user    0m9.413s
 sys     0m0.007s
 
 
+Go:
+
+$  time ./kitty-go
+Conversion completed successfully.
+
+real    1m50.584s
+user    1m50.182s
+sys     0m0.844s
+
+
 ```
 

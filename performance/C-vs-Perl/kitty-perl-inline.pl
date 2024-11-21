@@ -23,24 +23,23 @@ void hex_to_binary(SV *hex_sv, SV *binary_sv) {
     const char *hex_data = SvPV(hex_sv, hex_length);
 
     // Remove whitespace from hex_data
-    char *clean_hex_data = malloc(hex_length + 1);
-    if (clean_hex_data == NULL) {
-        croak("Memory allocation failed");
-    }
-    const char *hex_ptr = hex_data;
-    char *clean_ptr = clean_hex_data;
-    while (*hex_ptr) {
-        if (!isspace((unsigned char)*hex_ptr)) {
-            *clean_ptr++ = *hex_ptr;
-        }
-        hex_ptr++;
-    }
-    *clean_ptr = '\0';
+    //char *clean_hex_data = malloc(hex_length + 1);
+    //if (clean_hex_data == NULL) {
+        //croak("Memory allocation failed");
+    //}
+    //const char *hex_ptr = hex_data;
+    //char *clean_ptr = clean_hex_data;
+    //while (*hex_ptr) {
+        //if (!isspace((unsigned char)*hex_ptr)) {
+            //*clean_ptr++ = *hex_ptr;
+        //}
+        //hex_ptr++;
+    //}
+    //*clean_ptr = '\0';
 
-    hex_length = clean_ptr - clean_hex_data;
+    //hex_length = clean_ptr - clean_hex_data;
 
     if (hex_length % 2 != 0) {
-        free(clean_hex_data);
         croak("Hex data length is not even");
     }
 
@@ -49,8 +48,10 @@ void hex_to_binary(SV *hex_sv, SV *binary_sv) {
 
     // Convert hex to binary
     for (size_t i = 0; i < binary_size; i++) {
-        unsigned char high_nibble = hex_char_to_value(clean_hex_data[2 * i]);
-        unsigned char low_nibble = hex_char_to_value(clean_hex_data[2 * i + 1]);
+        //unsigned char high_nibble = hex_char_to_value(clean_hex_data[2 * i]);
+        //unsigned char low_nibble = hex_char_to_value(clean_hex_data[2 * i + 1]);
+        unsigned char high_nibble = hex_char_to_value(hex_data[2 * i]);
+        unsigned char low_nibble = hex_char_to_value(hex_data[2 * i + 1]);
         binary_data[i] = (high_nibble << 4) | low_nibble;
     }
 
@@ -58,7 +59,7 @@ void hex_to_binary(SV *hex_sv, SV *binary_sv) {
     SvSETMAGIC(binary_sv);
     SvPOK_on(binary_sv);
 
-    free(clean_hex_data);
+    //free(clean_hex_data);
 }
 
 END_OF_C_CODE
@@ -76,10 +77,13 @@ close($in_fh);
 # Create a scalar for binary data
 my $binary_data = '';
 
+$|=1;
+
 # Convert hex data to binary data using the C function
 my $iterations=0;
 for (my $i = 0; $i < 1024; $i++) {
 	hex_to_binary($hex_data, $binary_data);
+	print '.';
 	$iterations++;
 }
 
@@ -91,3 +95,4 @@ print $out_fh $binary_data;
 close($out_fh);
 
 print "Conversion completed successfully.\n";
+
