@@ -120,7 +120,7 @@ run the following script to create the source and destination tables.
 Load data into the source table.
 The following script creates 100 rows with the same photo.
 
-`./insert-photo.sh`
+`./insert-photos.sh`
 
 
 Now dump the table to a hex sqlldr file with dunldr.
@@ -128,20 +128,24 @@ Now dump the table to a hex sqlldr file with dunldr.
 `./dunldr.sh`
 
 
-Copy the blobsource.par file to blobtest.par
+Copy the blobsource.par file to blobdest.par
 
-Copy the blobsource.ctl file to blobtest.ctl
+Copy the blobsource.ctl file to blobdest.ctl
 
-Edit the blobtest.par file to point to the blobtest.ctl file.
+Edit the blobdest.par file to point to the blobdest.ctl file.
 
-Edit the blobtest.ctl file to load data into the BLOBDEST table.
+Edit the blobdest.ctl file to load data into the BLOBDEST table.
+Change the B1 column to C1 with a size of 10M.
+
+eg.  C1 CHAR(10000000)
+
 
 #### Create the hex_to_blob function
 
 The hex_to_blob function is used to convert the hex data to binary.
 
 ```sql
-@create/hex_to_blob.sql
+@create/hex-to-blob.sql
 ```
 
 #### Create the clob2clob function
@@ -181,7 +185,7 @@ Like the other Java function, it is too slow.
 #### blobdest.par
 
 ```
-userid = jkstill/XXX@server//db_service
+userid = jkstill/grok@lestrade/pdb01
 control = blobdest.ctl
 log = blobdest.log
 bad = blobdest.bad
@@ -190,7 +194,7 @@ bad = blobdest.bad
 #### blobdest.ctl
 
 ```
-options(direct=true,readsize=5000000)
+options(direct=true,readsize=10000000)
 load data
 infile 'blobsource.dat'
    "str '<EORD>'"
@@ -199,9 +203,11 @@ into table BLOBDEST
 fields terminated by '<EOFD>'
 trailing nullcols
 (
-        ID,
-        C1 CHAR(2500000)
+	ID,
+	NAME,
+	C1 CHAR(10000000) 
 )
+
 ```
 
 ## Test Results
@@ -209,7 +215,7 @@ trailing nullcols
 For best results, the BLOBDEST table should be dropped and recreated before each test.
 
 1000 rows loaded into BLOBSOURCE.
-Each row has an ID and a BLOB column B1, with a 1M photo inserted into each row.
+Each row has an ID and a BLOB column B1, with a photo inserted into each row.
 
 BLOBSOURCE was then dumped with `dunldr.sh` to create the data file for sqlldr.
 
@@ -217,8 +223,8 @@ The sequence of script to run:
 
 Prepare the data:
 
-* create/insert-photo.sh
-** this creates 1000 rows with a picture of a cat in each row
+* create/insert-photos.sh
+** this creates 400 rows with pictures of animals
 * dunldr.sh
 ** this creates the data file for sqlldr
 
@@ -472,8 +478,6 @@ The C program is about 2x faster than the Perl pack() method.
 
 ```
 1000 row(s) fetched
-Error occurred at OcilibEnvironmentCleanup: Found 999 non freed OCI descriptors
-Error occurred at OcilibEnvironmentCleanup: Found 39960 non freed allocated bytes
 
 real	0m27.456s
 user	0m11.928s
@@ -492,7 +496,7 @@ sys	0m1.076s
 
 ## Conclusion
 
-The Perl pack() method is the fastest method for converting a CLOB to a BLOB.
+The C program is the fastest method for converting a CLOB to a BLOB.
 
 
 

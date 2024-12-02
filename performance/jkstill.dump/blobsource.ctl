@@ -6,5 +6,6 @@ into table BLOBSOURCE
 fields terminated by '<EOFD>'
 (
 	ID,
-	B1 CHAR(2500000) 
+	NAME,
+	B1 CHAR(5000000) 
 )

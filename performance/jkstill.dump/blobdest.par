@@ -1,3 +1,4 @@
+userid = jkstill/grok@lestrade/pdb01
 control = blobdest.ctl
 log = blobdest.log
 bad = blobdest.bad

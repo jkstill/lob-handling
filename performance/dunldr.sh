@@ -8,7 +8,7 @@ cd $scriptHome || { echo "cd $scriptHome failed"; exit 1; }
 source ./setenv.sh
 
 ./dunldr \
-	--longlen 2500000 \
+	--longlen 5000000 \
 	--username jkstill \
 	--password grok \
 	--database $ezName \

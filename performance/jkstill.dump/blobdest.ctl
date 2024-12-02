@@ -1,4 +1,5 @@
-options(direct=true,readsize=5000000)
+
+options(direct=true,readsize=10000000)
 load data
 infile 'blobsource.dat'
    "str '<EORD>'"
@@ -8,5 +9,7 @@ fields terminated by '<EOFD>'
 trailing nullcols
 (
 	ID,
-	C1 CHAR(5000000) 
+	NAME,
+	C1 CHAR(10000000) 
 )
+
