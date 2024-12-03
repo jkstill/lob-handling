@@ -11,8 +11,8 @@ source ./setenv.sh
 
 #./insert-photo.pl --insert-as-clob --truncate --database $ezName --username jkstill --password grok --input-file $kittyPic
 
-#for imageNumber in $(seq -w 1 25)
-for imageNumber in '01'
+#for imageNumber in '01'
+for imageNumber in $(seq -w 1 25)
 do
 
 	for imageFile in ../images/*.jpg ../images/small/*.jpg

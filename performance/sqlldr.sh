@@ -14,4 +14,3 @@ cd jkstill.dump
 time sqlldr jkstill/grok@$ezName parfile=blobdest.par readsize=10000000 bindsize=10000000
 
 
-
