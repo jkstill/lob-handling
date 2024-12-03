@@ -14,7 +14,7 @@ compile:
 gcc -msse2 -O3 -o clob-to-blob clob-to-blob.c -O2 -l:libocilib.a -L$ORACLE_HOME/lib -lclntsh  -L/usr/local/lib -std=c99
 */
 
-#define DATA_SIZE_BUF 8 * 1048576
+#define DATA_SIZE_BUF 100 * 1048576
 #define DEBUG 0
 
 // Function to convert a single hex character to its numerical value
@@ -38,43 +38,54 @@ int hex_to_binary(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *binary_d
     size_t n;
     unsigned int hl = (*hex_length);
 
-    unsigned char *binary_char_data = (unsigned char *)malloc(DATA_SIZE_BUF);
-    char hex_char_data[DATA_SIZE_BUF+1];
+	if ( DEBUG == 1) fprintf(stderr,"      hex_to_binary:  assign buffers\n");
+	unsigned char *binary_char_data = (unsigned char *)malloc(DATA_SIZE_BUF/2);
+	unsigned char *hex_char_data  = (unsigned char *)malloc(DATA_SIZE_BUF+1);
+	if ( DEBUG == 1) fprintf(stderr,"      hex_to_binary:  buffers assigned\n");
 
-    n = OCI_LobRead(hex_data, hex_char_data, hl);
-    if (n % 2 != 0) {
-        fprintf(stderr, "Hex data length is not even.\n");
-        exit(EXIT_FAILURE);
-    }
 
-    for (size_t i = 0; i < n / 2; i++) {
-        unsigned char high_nibble = hex_char_to_value(hex_char_data[2 * i]);
-        if (high_nibble == '~') {
-            return '~';
-        }
+	if ( DEBUG == 1) {
+		fprintf(stderr,"      hex_to_binary - h:l %u\n",hl);;
+	}
 
-        unsigned char low_nibble = hex_char_to_value(hex_char_data[2 * i + 1]);
-        if (low_nibble == '~') {
-            return '~';
-        }
+	if ( DEBUG == 1) fprintf(stderr,"      hex_to_binary: calling OCI_LobRead\n");
+	n = OCI_LobRead(hex_data, hex_char_data, hl);
 
-        binary_char_data[i] = (high_nibble << 4) | low_nibble;
-    }
+	if ( DEBUG == 1) fprintf(stderr,"      hex_to_binary: returned from OCI_LobRead\n");
 
-    OCI_LobTruncate(binary_data, 0);
-    OCI_LobSeek(binary_data, 0, OCI_SEEK_SET);
-    OCI_LobAppend(binary_data, binary_char_data, n / 2);
+	if (n % 2 != 0) {
+			fprintf(stderr, "Hex data length is not even.\n");
+			exit(EXIT_FAILURE);
+	}
 
-    free(binary_char_data);
-    return 1;
+	for (size_t i = 0; i < n / 2; i++) {
+		unsigned char high_nibble = hex_char_to_value(hex_char_data[2 * i]);
+		if (high_nibble == '~') {
+			return '~';
+		}
+
+		unsigned char low_nibble = hex_char_to_value(hex_char_data[2 * i + 1]);
+		if (low_nibble == '~') {
+			return '~';
+		}
+
+		binary_char_data[i] = (high_nibble << 4) | low_nibble;
+	}
+
+	OCI_LobTruncate(binary_data, 0);
+	OCI_LobSeek(binary_data, 0, OCI_SEEK_SET);
+	OCI_LobAppend(binary_data, binary_char_data, n / 2);
+
+	free(binary_char_data);
+	return 1;
 }
 
 int hex_to_binary_new(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *binary_data) {
     size_t n;
     unsigned int hl = (*hex_length);
 
-    unsigned char *binary_char_data = (unsigned char *)malloc(DATA_SIZE_BUF);
-    char hex_char_data[DATA_SIZE_BUF+1];
+	unsigned char *binary_char_data = (unsigned char *)malloc(DATA_SIZE_BUF/2);
+	unsigned char *hex_char_data  = (unsigned char *)malloc(DATA_SIZE_BUF+1);
 
     n = OCI_LobRead(hex_data, hex_char_data, hl);
     if (n % 2 != 0) {
@@ -109,8 +120,8 @@ int hex_to_binary_new2(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *bin
     size_t n;
     unsigned int hl = (*hex_length);
 
-    unsigned char *binary_char_data = (unsigned char *)malloc(DATA_SIZE_BUF);
-    char hex_char_data[DATA_SIZE_BUF+1];
+	unsigned char *binary_char_data = (unsigned char *)malloc(DATA_SIZE_BUF/2);
+	unsigned char *hex_char_data  = (unsigned char *)malloc(DATA_SIZE_BUF+1);
 
     n = OCI_LobRead(hex_data, hex_char_data, hl);
     if (n % 2 != 0) {
@@ -259,6 +270,7 @@ int main(int argc, oarg* argv[])
 	stUpd = OCI_StatementCreate(cn);
 
 	OCI_ExecuteStmt(st, "select id, row_id from blobdest_rows -- where rownum < 101");
+	if ( DEBUG == 1) fprintf(stderr,"blobdest_rows query executed\n");
 
 	rs = OCI_GetResultset(st);
 
@@ -270,8 +282,10 @@ int main(int argc, oarg* argv[])
 		OCI_BindString(stBlob,OTEXT(":rowIdStr"), (char *)rowIdStr,64);
 
 		OCI_Execute(stBlob);
+		if ( DEBUG == 1) fprintf(stderr,"  blobdest query executed\n");
 
 		rsBlob = OCI_GetResultset(stBlob);
+		if ( DEBUG == 1) fprintf(stderr,"    blobdest query result\n");
 
 		// convert this loop to "if" should be only 1 row by rowid
 		// the "else" is an error condition
@@ -283,15 +297,25 @@ int main(int argc, oarg* argv[])
 			lob1 = OCI_GetLob(rsBlob, 2);
 			unsigned int srcLobLen = OCI_LobGetLength(lob1);
 
+			if ( DEBUG == 1) fprintf(stderr,"    srcLobLen: %i\n",srcLobLen);
+
+			if ( DEBUG == 1) fprintf(stderr,"    calling OCI_LobSeek\n");
 			OCI_LobSeek(lob1, 0, OCI_SEEK_SET );
+			if ( DEBUG == 1) fprintf(stderr,"    returned from OCI_LobSeek\n");
+
+			if ( DEBUG == 1) fprintf(stderr,"    calling hex_to_binary\n");
 			char retVal = hex_to_binary_new(lob1, &srcLobLen, lob2);
+			if ( DEBUG == 1) fprintf(stderr,"    returned from hex_to_binary\n");
+
 			if (retVal == '~' ) {
 				fprintf( stderr, "Error converting Hex to Binary\n");
 				break;
 			}
 
+			if ( DEBUG == 1) fprintf(stderr,"    calling OCI_LobGetLength\n");
 			unsigned int lob1len = OCI_LobGetLength(lob1);
 			unsigned int lob2len = OCI_LobGetLength(lob2);
+			if ( DEBUG == 1) fprintf(stderr,"    returned from OCI_LobGetLength\n");
 
 			// best to use this only if using short test data
 			if ( DEBUG == 1 ) {
@@ -322,6 +346,8 @@ int main(int argc, oarg* argv[])
 
 		OCI_LobFree(lob1);
 		OCI_LobFree(lob2);
+
+		if ( DEBUG == 1) fprintf(stderr,"===================================================\n");
 
 	}
 
