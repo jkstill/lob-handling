@@ -1,0 +1,3 @@
+control = blobdest.ctl
+log = blobdest.log
+bad = blobdest.bad
