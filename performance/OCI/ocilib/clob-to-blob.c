@@ -77,6 +77,7 @@ int hex_to_binary(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *binary_d
 	OCI_LobAppend(binary_data, binary_char_data, n / 2);
 
 	free(binary_char_data);
+   free(hex_char_data);
 	return 1;
 }
 
@@ -109,6 +110,7 @@ int hex_to_binary_new(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *bina
     OCI_LobAppend(binary_data, binary_char_data, n / 2);
 
     free(binary_char_data);
+    free(hex_char_data);
     return 1;
 }
 
@@ -205,6 +207,7 @@ int hex_to_binary_new2(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *bin
     OCI_LobAppend(binary_data, binary_char_data, n / 2);
 
     free(binary_char_data);
+    free(hex_char_data);
     return 1;
 }
 
