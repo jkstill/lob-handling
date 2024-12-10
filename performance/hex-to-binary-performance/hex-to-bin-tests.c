@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <inttypes.h>
 
@@ -12,7 +13,7 @@
  * because every two hex characters map to one byte */
 unsigned char result[TESTDATALEN/2];
 
-void test1()
+void calcHex2bin()
 {
     size_t i;
     char cur;
@@ -36,7 +37,7 @@ void test1()
     }
 }
 
-void test2()
+void lookup256()
 {
     size_t i;
     char cur;
@@ -54,7 +55,7 @@ void test2()
     }
 }
 
-void test3()
+void lookup32k()
 {
     size_t i;
     uint16_t *cur;
@@ -67,7 +68,7 @@ void test3()
     }
 }
 
-void test4()
+void lookup64k()
 {
     size_t i;
     uint16_t *cur;
@@ -79,7 +80,7 @@ void test4()
     }
 }
 
-#define NUMTESTS 1000
+#define NUMTESTS 10
 
 int main() {
     struct timespec before, after;
@@ -91,7 +92,7 @@ int main() {
 
     clock_gettime(CLOCK_MONOTONIC, &before);
     for (i = 0; i < NUMTESTS; i++) {
-        test1();
+        calcHex2bin();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
 
@@ -105,7 +106,7 @@ int main() {
 
     clock_gettime(CLOCK_MONOTONIC, &before);
     for (i = 0; i < NUMTESTS; i++) {
-        test2();
+        lookup256();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
 
@@ -119,7 +120,7 @@ int main() {
 
     clock_gettime(CLOCK_MONOTONIC, &before);
     for (i = 0; i < NUMTESTS; i++) {
-        test3();
+        lookup32k();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
 
@@ -133,7 +134,7 @@ int main() {
 
     clock_gettime(CLOCK_MONOTONIC, &before);
     for (i = 0; i < NUMTESTS; i++) {
-        test4();
+        lookup64k();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
 
@@ -147,3 +148,4 @@ int main() {
 
     return 0;
 }
+

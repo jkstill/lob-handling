@@ -16,7 +16,10 @@ Additional optimized hex to binary conversions test6() using SIMD with help from
 
 Compile:
 
-$  gcc -msse2 -O3 -o hex-to-bin-tests-new hex-to-bin-tests-new.c
+# -msse2 for SSE2 emmintrin.h
+# -mssse3 for SSSE3 tmmintrin.h
+
+$  gcc -mssse3 -O3 -o hex-to-bin-tests-new hex-to-bin-tests-new.c
 
 
 
