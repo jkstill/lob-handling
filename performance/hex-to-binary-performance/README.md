@@ -21,6 +21,7 @@ Compile:
 
 $  gcc -mssse3 -O3 -o hex-to-bin-tests-new hex-to-bin-tests-new.c
 
+$  gcc -msse2 -mssse3 -O3 -O2 -o hex-to-bin-tests-new hex-to-bin-tests-new.c
 
 
 
