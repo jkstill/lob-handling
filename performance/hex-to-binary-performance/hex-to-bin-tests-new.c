@@ -2,23 +2,93 @@
 #include <time.h>
 #include <inttypes.h>
 #include <string.h>
-//#include <emmintrin.h> // SSE2 header
+#include <emmintrin.h> // SSE2 header
 #include <tmmintrin.h>  // for _mm_shuffle_epi8 (SSSE3)							  
 
 #include "testdata.h"
 #include "base16_decoding_table.h"
 
-//#define TESTDATALEN 104857600
-#define TESTDATALEN 10485760
+#define TESTDATALEN 10000000
 
 /* the resulting binary string is half the size of the input hex string
  * because every two hex characters map to one byte */
 unsigned char result[TESTDATALEN/2];
 
+// this SIMD code is much faster than the  lookup table code (test4)
+// however, this does not speed up the clob converion much, as most time is spent in the database
+void superScalarSSE2(void)
+{
+    // Constants stored in arrays
+    static const unsigned char lookup_high_values[16] = {
+        0x00, 0x10, 0x20, 0x30,
+        0x40, 0x50, 0x60, 0x70,
+        0x80, 0x90, 0xA0, 0xB0,
+        0xC0, 0xD0, 0xE0, 0xF0
+    };
+
+    static const unsigned char lookup_low_values[16] = {
+        0x00, 0x01, 0x02, 0x03,
+        0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0A, 0x0B,
+        0x0C, 0x0D, 0x0E, 0x0F
+    };
+
+    // Load constants into __m128i variables at runtime
+    __m128i lookup_high = _mm_loadu_si128((const __m128i *)lookup_high_values);
+    __m128i lookup_low = _mm_loadu_si128((const __m128i *)lookup_low_values);
+
+    size_t i;
+    for (i = 0; i + 32 <= TESTDATALEN; i += 32) {
+        // Load 32 hex characters
+        __m128i chars_high = _mm_loadu_si128((const __m128i *)(testdata + i));
+        __m128i chars_low = _mm_loadu_si128((const __m128i *)(testdata + i + 16));
+
+        // Convert hex characters to their numeric values
+        // For simplicity, let's assume that all characters are valid hex digits (0-9, A-F, a-f)
+        // You should add validation if necessary
+
+        // Subtract '0' or 'A'-10 to get the numeric value
+        __m128i mask_num = _mm_set1_epi8(0x0F);
+
+        // Process high nibbles
+        __m128i high_nibbles = _mm_sub_epi8(chars_high, _mm_set1_epi8('0'));
+        __m128i high_mask = _mm_cmpgt_epi8(high_nibbles, _mm_set1_epi8(9));
+        high_nibbles = _mm_add_epi8(high_nibbles, _mm_and_si128(high_mask, _mm_set1_epi8(39))); // Adjust for 'A'-'0'-10
+
+        // Process low nibbles
+        __m128i low_nibbles = _mm_sub_epi8(chars_low, _mm_set1_epi8('0'));
+        __m128i low_mask = _mm_cmpgt_epi8(low_nibbles, _mm_set1_epi8(9));
+        low_nibbles = _mm_add_epi8(low_nibbles, _mm_and_si128(low_mask, _mm_set1_epi8(39))); // Adjust for 'A'-'0'-10
+
+        // Pack nibbles into bytes
+        __m128i high_nibbles_shifted = _mm_slli_epi16(high_nibbles, 4);
+        __m128i bytes = _mm_or_si128(high_nibbles_shifted, low_nibbles);
+
+        // Store the result
+        _mm_storeu_si128((__m128i *)(result + i / 2), bytes);
+    }
+
+    // Process any remaining characters
+    for (; i < TESTDATALEN; i += 2) {
+        unsigned char high = testdata[i];
+        unsigned char low = testdata[i + 1];
+
+        high = (high >= '0' && high <= '9') ? high - '0' :
+               (high >= 'A' && high <= 'F') ? high - 'A' + 10 :
+               (high >= 'a' && high <= 'f') ? high - 'a' + 10 : 0;
+
+        low = (low >= '0' && low <= '9') ? low - '0' :
+              (low >= 'A' && low <= 'F') ? low - 'A' + 10 :
+              (low >= 'a' && low <= 'f') ? low - 'a' + 10 : 0;
+
+        result[i / 2] = (high << 4) | low;
+    }
+}
+
 
 // this SIMD code is much faster than the  lookup table code (lookup64k)
 // however, this does not speed up the clob converion much, as most time is spent in the database
-void superScalar(void)
+void superScalarSSSE3(void)
 {
     strcpy((char *)result, "\0");
 
@@ -234,7 +304,7 @@ void writeHex(char *filename)
 
 
 
-#define NUMTESTS 10
+#define NUMTESTS 100
 
 int main() {
     struct timespec before, after;
@@ -262,10 +332,10 @@ int main() {
     printf("arithmetic solution calcHex() took %f seconds\n", elapsed);
 
 
-	 //-- SuperScalar
+	 //-- SuperScalar SSE2
     clock_gettime(CLOCK_MONOTONIC, &before);
     for (i = 0; i < NUMTESTS; i++) {
-        superScalar();
+        superScalarSSE2();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
 
@@ -275,8 +345,24 @@ int main() {
     }
     printf("checksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup superScalar() took %f seconds\n", elapsed);
-	 writeResults("superScaler.dat");
+    printf("optimized lookup superScalarSSE2() took %f seconds\n", elapsed);
+	 writeResults("superScalerSSE2.dat");
+
+	 //-- SuperScalar SSSE3
+    clock_gettime(CLOCK_MONOTONIC, &before);
+    for (i = 0; i < NUMTESTS; i++) {
+        superScalarSSSE3();
+    }
+    clock_gettime(CLOCK_MONOTONIC, &after);
+
+    checksum = 0;
+    for (i = 0; i < TESTDATALEN/2; i++) {
+        checksum += result[i];
+    }
+    printf("checksum: %llu\n", checksum);
+    elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
+    printf("optimized lookup superScalarSSSE3() took %f seconds\n", elapsed);
+	 writeResults("superScalerSSSE3.dat");
 
 	 // -----
 
