@@ -10,6 +10,11 @@ Investigate methods for handling CLOB and BLOB objects
 - write to filesystem
 - convert between BLOB <-> CLOB
 
-Use both PL/SQL and Perl
+Use PL/SQL, Perl, and C (with ocilib)
+
+[OCILIB - Driver for Oracle docs](https://github.com/vrogier/ocilib)
+[ocilib - github](https://vrogier.github.io/ocilib/doc/)
+
+
 
 
