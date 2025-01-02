@@ -12,8 +12,9 @@ Investigate methods for handling CLOB and BLOB objects
 
 Use PL/SQL, Perl, and C (with ocilib)
 
-[OCILIB - Driver for Oracle docs](https://github.com/vrogier/ocilib)
-[ocilib - github](https://vrogier.github.io/ocilib/doc/)
+  [OCILIB - Driver for Oracle docs](https://github.com/vrogier/ocilib)
+
+  [ocilib - github](https://vrogier.github.io/ocilib/doc/)
 
 
 
