@@ -260,96 +260,101 @@ int main(void) {
     //QueueEntry entries[1] = {{"WFASSIGNMENT", "AAARkJAAEAAAMTEAAA"}};
     //int num_entries = 1;
 	 //
-	 QueueEntry entries[MAX_BATCH_SIZE];
-    int num_entries = dequeue_batch(cn, entries, MAX_BATCH_SIZE);
-    if (num_entries == 0) {
-        fprintf(logf, "No messages dequeued.\n");
-        OCI_ConnectionFree(cn);
-        OCI_Cleanup();
-        fclose(logf);
-        return 0;
-    }
 
 
-    OCI_Statement *stSel = OCI_StatementCreate(cn);
-    OCI_Statement *stLock = OCI_StatementCreate(cn);
-    OCI_Statement *stUpd = OCI_StatementCreate(cn);
+    while (1) {
 
-    for (int i = 0; i < num_entries; ++i) {
-        if (strcmp(entries[i].tablename, last_tablename) != 0) {
-            if (!load_column_metadata(cn, entries[i].tablename, logf) || !generate_sql_templates(entries[i].tablename, logf)) continue;
-            //strncpy(last_tablename, entries[i].tablename, sizeof(last_tablename));
-				strncpy(last_tablename, entries[i].tablename, sizeof(last_tablename) - 1);
-            last_tablename[sizeof(last_tablename) - 1] = '\0';
+        QueueEntry *entries = malloc(sizeof(QueueEntry) * MAX_BATCH_SIZE);
+        if (!entries) {
+            fprintf(logf, "Memory allocation failed for QueueEntry list.\\n");
+            break;
         }
 
-		  fprintf(logf, "DEBUG: Executing SQL: %s|\n", sql_template.select_sql);
-        OCI_Prepare(stSel, sql_template.select_sql);
-
-        //OCI_BindString(stSel, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
-		  OCI_BindString(stSel, ":row_id", (otext *)entries[i].rowid, (unsigned int)(strlen(entries[i].rowid) + 1));
-		  fprintf(logf, "DEBUG: RowId: %s|\n", entries[i].rowid);
-
-        if (!OCI_Execute(stSel)) {
-            OCI_Error *err = OCI_GetLastError();
-            fprintf(logf, "[OCI Error] %s\n", OCI_ErrorGetString(err));
-				fprintf(logf, "Failed to execute select statement for table: %s\n", entries[i].tablename);
-				OCI_Rollback(cn);
-            OCI_ConnectionFree(cn);
-            OCI_Cleanup();
-            fclose(logf);
-				return 1;
-		  }
-
-        OCI_Resultset *rs = OCI_GetResultset(stSel);
-        if (!OCI_FetchNext(rs)) continue;
-
-        //OCI_Lob *srcLobList[MAX_COLUMNS], *dstLobList[MAX_COLUMNS];
-        OCI_Lob **srcLobList = malloc(sizeof(OCI_Lob *) * sql_template.column_count);
-        OCI_Lob **dstLobList = malloc(sizeof(OCI_Lob *) * sql_template.column_count);
-
-        char bind_blob_param[64];
-
-        for (int col = 0; col < column_count; ++col) {
-            srcLobList[col] = OCI_GetLob(rs, col + 2);
-            dstLobList[col] = OCI_LobCreate(cn, OCI_BLOB);
-            unsigned int lobLen = OCI_LobGetLength(srcLobList[col]);
-            hex_to_binary_sse3(srcLobList[col], &lobLen, dstLobList[col]);
+        int num_entries = dequeue_batch(cn, entries, MAX_BATCH_SIZE);
+        if (num_entries == 0) {
+            fprintf(logf, "No messages dequeued. Exiting.\\n");
+            free(entries);
+            break;
         }
 
-		  fprintf(logf, "DEBUG: Executing SQL: %s\n", sql_template.lock_sql);
-        OCI_Prepare(stLock, sql_template.lock_sql);
-        OCI_BindString(stLock, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
-        OCI_Execute(stLock);
+        fprintf(logf, "Dequeued %d messages from the queue.\\n", num_entries);
 
-		  fprintf(logf, "DEBUG: Executing SQL: %s\n", sql_template.update_sql);
-        OCI_Prepare(stUpd, sql_template.update_sql);
-        OCI_BindString(stUpd, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
-        for (int col = 0; col < column_count; ++col) {
-            snprintf(bind_blob_param, sizeof(bind_blob_param), ":%s", column_maps[col].blob_col);
-            OCI_BindLob(stUpd, bind_blob_param, dstLobList[col]);
+        OCI_Statement *stSel = OCI_StatementCreate(cn);
+        OCI_Statement *stLock = OCI_StatementCreate(cn);
+        OCI_Statement *stUpd = OCI_StatementCreate(cn);
+
+        for (int i = 0; i < num_entries; ++i) {
+            if (strcmp(entries[i].tablename, last_tablename) != 0) {
+                if (!load_column_metadata(cn, entries[i].tablename, logf) || !generate_sql_templates(entries[i].tablename, logf)) continue;
+                //strncpy(last_tablename, entries[i].tablename, sizeof(last_tablename));
+				    strncpy(last_tablename, entries[i].tablename, sizeof(last_tablename) - 1);
+                last_tablename[sizeof(last_tablename) - 1] = '\0';
+            }
+
+		      fprintf(logf, "DEBUG: Executing SQL: %s|\n", sql_template.select_sql);
+            OCI_Prepare(stSel, sql_template.select_sql);
+
+            //OCI_BindString(stSel, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
+		      OCI_BindString(stSel, ":row_id", (otext *)entries[i].rowid, (unsigned int)(strlen(entries[i].rowid) + 1));
+		      fprintf(logf, "DEBUG: RowId: %s|\n", entries[i].rowid);
+
+            if (!OCI_Execute(stSel)) {
+                OCI_Error *err = OCI_GetLastError();
+                fprintf(logf, "[OCI Error] %s\n", OCI_ErrorGetString(err));
+				    fprintf(logf, "Failed to execute select statement for table: %s\n", entries[i].tablename);
+				    OCI_Rollback(cn);
+                OCI_ConnectionFree(cn);
+                OCI_Cleanup();
+                fclose(logf);
+				    return 1;
+		      }
+
+            OCI_Resultset *rs = OCI_GetResultset(stSel);
+            if (!OCI_FetchNext(rs)) continue;
+
+            //OCI_Lob *srcLobList[MAX_COLUMNS], *dstLobList[MAX_COLUMNS];
+            OCI_Lob **srcLobList = malloc(sizeof(OCI_Lob *) * sql_template.column_count);
+            OCI_Lob **dstLobList = malloc(sizeof(OCI_Lob *) * sql_template.column_count);
+
+            char bind_blob_param[64];
+
+            for (int col = 0; col < column_count; ++col) {
+                srcLobList[col] = OCI_GetLob(rs, col + 2);
+                dstLobList[col] = OCI_LobCreate(cn, OCI_BLOB);
+                unsigned int lobLen = OCI_LobGetLength(srcLobList[col]);
+                hex_to_binary_sse3(srcLobList[col], &lobLen, dstLobList[col]);
+            }
+
+		      fprintf(logf, "DEBUG: Executing SQL: %s\n", sql_template.lock_sql);
+            OCI_Prepare(stLock, sql_template.lock_sql);
+            OCI_BindString(stLock, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
+            OCI_Execute(stLock);
+
+		      fprintf(logf, "DEBUG: Executing SQL: %s\n", sql_template.update_sql);
+            OCI_Prepare(stUpd, sql_template.update_sql);
+            OCI_BindString(stUpd, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
+            for (int col = 0; col < column_count; ++col) {
+                snprintf(bind_blob_param, sizeof(bind_blob_param), ":%s", column_maps[col].blob_col);
+                OCI_BindLob(stUpd, bind_blob_param, dstLobList[col]);
+            }
+            OCI_Execute(stUpd);
+
+            for (int i = 0; i < column_count; ++i) {
+                if (srcLobList[i]) OCI_LobFree(srcLobList[i]);
+                if (dstLobList[i]) OCI_LobFree(dstLobList[i]);
+            }
+            free(srcLobList);
+            free(dstLobList);
+
         }
-        OCI_Execute(stUpd);
 
-        for (int i = 0; i < column_count; ++i) {
-            if (srcLobList[i]) OCI_LobFree(srcLobList[i]);
-            if (dstLobList[i]) OCI_LobFree(dstLobList[i]);
-        }
-        free(srcLobList);
-        free(dstLobList);
+        OCI_Commit(cn);
 
-	     //for (int col = 0; col < column_count; ++col) {
-		      //OCI_LobFree(srcLobList[col]);
-		      //OCI_LobFree(dstLobList[col]);
-	     //}
-	 	//free(entries);
-    }
+        if (stSel) OCI_StatementFree(stSel);
+        if (stUpd) OCI_StatementFree(stUpd);
+        if (stLock) OCI_StatementFree(stLock);
 
-    OCI_Commit(cn);
-
-    if (stSel) OCI_StatementFree(stSel);
-    if (stUpd) OCI_StatementFree(stUpd);
-    if (stLock) OCI_StatementFree(stLock);
+	 }
 
     OCI_ConnectionFree(cn);
     OCI_Cleanup();
