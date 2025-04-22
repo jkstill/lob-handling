@@ -1,0 +1,4 @@
+username:blobtest
+password:blobtest
+database://lestrade:1521/pdb01
+hostname:lestrade

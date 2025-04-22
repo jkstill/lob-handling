@@ -118,7 +118,7 @@ int hex_to_binary_new(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *bina
 // this SIMD code is much faster than the  lookup table code (test4)
 // however, this does not speed up the clob converion much, as most time is spent in the database
 
-int hex_to_binary_new2(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *binary_data) {
+int hex_to_binary_sse3(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *binary_data) {
     size_t n;
     unsigned int hl = (*hex_length);
 
@@ -261,16 +261,26 @@ int main(int argc, oarg* argv[])
 	int id ;
 	size_t n;
 
-	if (!OCI_Initialize(err_handler, NULL, OCI_ENV_DEFAULT))
+	if (!OCI_Initialize(err_handler, NULL, OCI_ENV_DEFAULT|OCI_ENV_CONTEXT ))
 	{
 		printf("something failed\n");
 		return EXIT_FAILURE;
 	}
 
 	cn = OCI_ConnectionCreate(dbs, usr, pwd, OCI_SESSION_DEFAULT);
+	if (! cn )
+	{
+		printf("Connection failed\n");
+		//err_handler(OCI_GetLastError());
+		return EXIT_FAILURE;
+	}
+
 	st = OCI_StatementCreate(cn);
 	stBlob = OCI_StatementCreate(cn);
 	stUpd = OCI_StatementCreate(cn);
+
+	//OCI_ExecuteStmt(st, "alter session set tracefile_identifier = 'CLOBTOBLOB' ");
+	//OCI_ExecuteStmt(st, "alter session set events '10046 trace name context forever, level 12'");
 
 	OCI_ExecuteStmt(st, "select id, row_id from blobdest_rows -- where rownum < 101");
 	if ( DEBUG == 1) fprintf(stderr,"blobdest_rows query executed\n");
@@ -307,7 +317,7 @@ int main(int argc, oarg* argv[])
 			if ( DEBUG == 1) fprintf(stderr,"    returned from OCI_LobSeek\n");
 
 			if ( DEBUG == 1) fprintf(stderr,"    calling hex_to_binary\n");
-			char retVal = hex_to_binary_new(lob1, &srcLobLen, lob2);
+			char retVal = hex_to_binary_sse3(lob1, &srcLobLen, lob2);
 			if ( DEBUG == 1) fprintf(stderr,"    returned from hex_to_binary\n");
 
 			if (retVal == '~' ) {

@@ -15,7 +15,10 @@
 unsigned char result[TESTDATALEN/2];
 
 // this SIMD code is much faster than the  lookup table code (test4)
-// however, this does not speed up the clob converion much, as most time is spent in the database
+// this is 10x faster than the hex lookup table
+// cannot get sse2 code to work properly
+// spent a couple hours on this with ChatGPT, no success
+// stick with SSSE3
 void superScalarSSE2(void)
 {
     // Constants stored in arrays
@@ -61,11 +64,23 @@ void superScalarSSE2(void)
         low_nibbles = _mm_add_epi8(low_nibbles, _mm_and_si128(low_mask, _mm_set1_epi8(39))); // Adjust for 'A'-'0'-10
 
         // Pack nibbles into bytes
-        __m128i high_nibbles_shifted = _mm_slli_epi16(high_nibbles, 4);
-        __m128i bytes = _mm_or_si128(high_nibbles_shifted, low_nibbles);
+        //__m128i high_nibbles_shifted = _mm_slli_epi16(high_nibbles, 4);
+        //__m128i bytes = _mm_or_si128(high_nibbles_shifted, low_nibbles);
+
+// Shift high nibbles into upper 4 bits of each byte
+__m128i high_shifted = _mm_slli_epi16(high_nibbles, 4);
+
+// OR high and low nibbles together (still 16-bit lanes)
+__m128i combined = _mm_or_si128(high_shifted, low_nibbles);
+
+// Pack 16-bit lanes down to 8-bit
+__m128i bytes = _mm_packus_epi16(combined, _mm_setzero_si128());
+
+// Store the lower 16 bytes (128 bits)
+_mm_storeu_si128((__m128i *)(result + i / 2), bytes);
 
         // Store the result
-        _mm_storeu_si128((__m128i *)(result + i / 2), bytes);
+        //_mm_storeu_si128((__m128i *)(result + i / 2), bytes);
     }
 
     // Process any remaining characters
@@ -333,20 +348,21 @@ int main() {
 
 
 	 //-- SuperScalar SSE2
-    clock_gettime(CLOCK_MONOTONIC, &before);
-    for (i = 0; i < NUMTESTS; i++) {
-        superScalarSSE2();
-    }
-    clock_gettime(CLOCK_MONOTONIC, &after);
+	 // SSSE2 code is not working
+    //clock_gettime(CLOCK_MONOTONIC, &before);
+    //for (i = 0; i < NUMTESTS; i++) {
+        //superScalarSSE2();
+    //}
+    //clock_gettime(CLOCK_MONOTONIC, &after);
 
-    checksum = 0;
-    for (i = 0; i < TESTDATALEN/2; i++) {
-        checksum += result[i];
-    }
-    printf("checksum: %llu\n", checksum);
-    elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup superScalarSSE2() took %f seconds\n", elapsed);
-	 writeResults("superScalerSSE2.dat");
+    //checksum = 0;
+    //for (i = 0; i < TESTDATALEN/2; i++) {
+        //checksum += result[i];
+    //}
+    //printf("checksum: %llu\n", checksum);
+    //elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
+    //printf("optimized lookup superScalarSSE2() took %f seconds\n", elapsed);
+	 //writeResults("superScalerSSE2.dat");
 
 	 //-- SuperScalar SSSE3
     clock_gettime(CLOCK_MONOTONIC, &before);

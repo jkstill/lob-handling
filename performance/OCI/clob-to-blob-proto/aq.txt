@@ -1,0 +1,228 @@
+SQL> desc SYS.AQ$_JMS_TEXT_MESSAGE
+ Name                                      Null?    Type
+ ----------------------------------------- -------- ----------------------------
+ HEADER                                             SYS.AQ$_JMS_HEADER
+ TEXT_LEN                                           NUMBER(38)
+ TEXT_VC                                            VARCHAR2(4000)
+ TEXT_LOB                                           CLOB
+
+METHOD
+------
+ STATIC FUNCTION CONSTRUCT RETURNS AQ$_JMS_TEXT_MESSAGE
+
+METHOD
+------
+ MEMBER PROCEDURE SET_TEXT
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PAYLOAD                        VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_TEXT
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PAYLOAD                        CLOB                    IN    
+
+METHOD
+------
+ MEMBER PROCEDURE GET_TEXT
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PAYLOAD                        VARCHAR2                OUT   
+
+METHOD
+------
+ MEMBER PROCEDURE GET_TEXT
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PAYLOAD                        CLOB                    OUT NOCOPY
+
+METHOD
+------
+ MEMBER PROCEDURE SET_REPLYTO
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ REPLYTO                        AQ$_AGENT               IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_TYPE
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ TYPE                           VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_USERID
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ USERID                         VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_APPID
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ APPID                          VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_GROUPID
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ GROUPID                        VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_GROUPSEQ
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ GROUPSEQ                       NUMBER                  IN    
+ MEMBER PROCEDURE CLEAR_PROPERTIES
+
+METHOD
+------
+ MEMBER PROCEDURE SET_BOOLEAN_PROPERTY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+ PROPERTY_VALUE                 BOOLEAN                 IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_BYTE_PROPERTY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+ PROPERTY_VALUE                 NUMBER                  IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_SHORT_PROPERTY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+ PROPERTY_VALUE                 NUMBER                  IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_INT_PROPERTY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+ PROPERTY_VALUE                 NUMBER                  IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_LONG_PROPERTY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+ PROPERTY_VALUE                 NUMBER                  IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_FLOAT_PROPERTY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+ PROPERTY_VALUE                 NUMBER                  IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_DOUBLE_PROPERTY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+ PROPERTY_VALUE                 NUMBER                  IN    
+
+METHOD
+------
+ MEMBER PROCEDURE SET_STRING_PROPERTY
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+ PROPERTY_VALUE                 VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER FUNCTION GET_REPLYTO RETURNS AQ$_AGENT
+
+METHOD
+------
+ MEMBER FUNCTION GET_TYPE RETURNS VARCHAR2
+
+METHOD
+------
+ MEMBER FUNCTION GET_USERID RETURNS VARCHAR2
+
+METHOD
+------
+ MEMBER FUNCTION GET_APPID RETURNS VARCHAR2
+
+METHOD
+------
+ MEMBER FUNCTION GET_GROUPID RETURNS VARCHAR2
+
+METHOD
+------
+ MEMBER FUNCTION GET_GROUPSEQ RETURNS NUMBER
+
+METHOD
+------
+ MEMBER FUNCTION GET_BOOLEAN_PROPERTY RETURNS BOOLEAN
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER FUNCTION GET_BYTE_PROPERTY RETURNS NUMBER
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER FUNCTION GET_SHORT_PROPERTY RETURNS NUMBER
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER FUNCTION GET_INT_PROPERTY RETURNS NUMBER
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER FUNCTION GET_LONG_PROPERTY RETURNS NUMBER
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER FUNCTION GET_FLOAT_PROPERTY RETURNS NUMBER
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER FUNCTION GET_DOUBLE_PROPERTY RETURNS NUMBER
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+
+METHOD
+------
+ MEMBER FUNCTION GET_STRING_PROPERTY RETURNS VARCHAR2
+ Argument Name                  Type                    In/Out Default?
+ ------------------------------ ----------------------- ------ --------
+ PROPERTY_NAME                  VARCHAR2                IN    
+
+SQL> spool off
