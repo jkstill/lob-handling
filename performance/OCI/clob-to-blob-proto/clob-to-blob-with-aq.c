@@ -9,11 +9,12 @@
 #include <ctype.h>
 #include <emmintrin.h> // SSE3
 
-#define MAX_BATCH_SIZE 100
+#define MAX_BATCH_SIZE 10
 #define MAX_COLUMNS 8
 #define DATA_SIZE_BUF 100 * 1048576
 #define LOG_DIR "c2b-log"
 #define CREDENTIAL_FILE "ora-creds.txt"
+#define DEBUG 1
 
 typedef struct {
     char tablename[128];
@@ -158,10 +159,13 @@ int generate_sql_templates(const char *tablename, FILE *logf) {
             strncat(update_buf, ", ", sizeof(update_buf) - strlen(update_buf) - 1);
     }
 
+
     snprintf(lock_buf, sizeof(lock_buf), "SELECT 1 FROM %s WHERE rowid = :row_id FOR UPDATE", tablename);
     strcat(select_buf, " FROM ");
     strcat(select_buf, tablename);
     strcat(select_buf, " WHERE rowid = :row_id");
+    strncat(select_buf, " FOR UPDATE", sizeof(select_buf) - strlen(select_buf) - 1);
+
     strcat(update_buf, " WHERE rowid = :row_id");
 
     strncpy(sql_template.select_sql, select_buf, sizeof(sql_template.select_sql));
@@ -237,12 +241,59 @@ void oci_error_handler(OCI_Error *err) {
     fprintf(stderr, "[OCILib Error] %s\n", OCI_ErrorGetString(err));
 }
 
+void ferr_handler(OCI_Error *err,  FILE *logf)
+{
+    printf
+    (
+        "code  : ORA-%05i\n"
+        "msg   : %s\n"
+        "sql   : %s\n",
+        OCI_ErrorGetOCICode(err),
+        OCI_ErrorGetString(err),
+        OCI_GetSql(OCI_ErrorGetStatement(err))
+    );
+	//fprintf(logf, "code  : ORA-%05i\n", OCI_ErrorGetOCICode(err));
+}
+
+
+void err_handler(OCI_Error *err)
+{
+    printf
+    (
+        "code  : ORA-%05i\n"
+        "msg   : %s\n"
+        "sql   : %s\n",
+        OCI_ErrorGetOCICode(err),
+        OCI_ErrorGetString(err),
+        OCI_GetSql(OCI_ErrorGetStatement(err))
+    );
+	//fprintf(logf, "code  : ORA-%05i\n", OCI_ErrorGetOCICode(err));
+}
+
+
+int free_lobs(OCI_Lob **lobs, int count) {
+	 for (int i = 0; i < count; ++i) {
+		  if (lobs[i]) OCI_LobFree(lobs[i]);
+	 }
+    if (lobs) free(lobs);
+	 return 1;
+}
+
 int main(void) {
     mkdir(LOG_DIR, 0777);
     FILE *logf = open_log_file();
     if (!logf || !read_credentials(CREDENTIAL_FILE, &creds)) return 1;
 
-    OCI_Initialize(oci_error_handler, NULL, OCI_ENV_DEFAULT|OCI_ENV_CONTEXT);
+    //OCI_Initialize(oci_error_handler, NULL, OCI_ENV_DEFAULT|OCI_ENV_CONTEXT);
+	 
+	 // an attempt to automatically log errors to a file
+	 // OCILib does not support this yet
+	 //void (*errHandler)(OCI_Error *err, FILE *logf);
+	 //errHandler = ferr_handler;
+    // OCI_Initialize(errHandler, NULL, OCI_ENV_DEFAULT|OCI_ENV_CONTEXT);
+    //OCI_Initialize(err_handler, NULL, OCI_ENV_DEFAULT|OCI_ENV_CONTEXT);
+    OCI_Initialize(NULL, NULL, OCI_ENV_DEFAULT|OCI_ENV_CONTEXT);
+
     OCI_Connection *cn = OCI_ConnectionCreate(creds.db, creds.user, creds.pwd, OCI_SESSION_DEFAULT);
 	 if (!cn) {
 		  fprintf(logf, "Failed to connect to database: %s\n", OCI_ErrorGetString(OCI_GetLastError()));
@@ -277,10 +328,10 @@ int main(void) {
             break;
         }
 
-        fprintf(logf, "Dequeued %d messages from the queue.\\n", num_entries);
+        fprintf(logf, "Dequeued %d messages from the queue.\n", num_entries);
 
         OCI_Statement *stSel = OCI_StatementCreate(cn);
-        OCI_Statement *stLock = OCI_StatementCreate(cn);
+        //OCI_Statement *stLock = OCI_StatementCreate(cn);
         OCI_Statement *stUpd = OCI_StatementCreate(cn);
 
         for (int i = 0; i < num_entries; ++i) {
@@ -291,26 +342,36 @@ int main(void) {
                 last_tablename[sizeof(last_tablename) - 1] = '\0';
             }
 
-		      fprintf(logf, "DEBUG: Executing SQL: %s|\n", sql_template.select_sql);
-            OCI_Prepare(stSel, sql_template.select_sql);
+		      if (DEBUG) fprintf(logf, "DEBUG: Executing SQL: %s|\n", sql_template.select_sql);
+            if (!OCI_Prepare(stSel, sql_template.select_sql)) {
+					 OCI_Error *err = OCI_GetLastError();
+					 fprintf(logf, "[OCI_Prepare stSel] %s:%s\n", OCI_ErrorGetString(err),sql_template.select_sql);
+				    continue;
+            }
 
             //OCI_BindString(stSel, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
-		      OCI_BindString(stSel, ":row_id", (otext *)entries[i].rowid, (unsigned int)(strlen(entries[i].rowid) + 1));
-		      fprintf(logf, "DEBUG: RowId: %s|\n", entries[i].rowid);
+		      if (!OCI_BindString(stSel, ":row_id", (otext *)entries[i].rowid, (unsigned int)(strlen(entries[i].rowid) + 1))) {
+					 OCI_Error *err = OCI_GetLastError();
+					 fprintf(logf, "[OCI_BindString stSel] %s:%s:%s\n", OCI_ErrorGetString(err),entries[i].rowid, sql_template.select_sql);
+				    continue;
+            }
+
+		      if (DEBUG) fprintf(logf, "DEBUG: RowId: %s|\n", entries[i].rowid);
 
             if (!OCI_Execute(stSel)) {
                 OCI_Error *err = OCI_GetLastError();
                 fprintf(logf, "[OCI Error] %s\n", OCI_ErrorGetString(err));
-				    fprintf(logf, "Failed to execute select statement for table: %s\n", entries[i].tablename);
-				    OCI_Rollback(cn);
-                OCI_ConnectionFree(cn);
-                OCI_Cleanup();
-                fclose(logf);
-				    return 1;
+				    fprintf(logf, "[C2B Exec stSel]:%s:%s:%s\n", entries[i].tablename,entries[i].rowid, sql_template.select_sql);
+				    continue;
 		      }
 
             OCI_Resultset *rs = OCI_GetResultset(stSel);
-            if (!OCI_FetchNext(rs)) continue;
+            if (!OCI_FetchNext(rs)) {
+                OCI_Error *err = OCI_GetLastError();
+                fprintf(logf, "[OCI Error] %s\n", OCI_ErrorGetString(err));
+				    fprintf(logf, "[C2B Fetch stSel]:%s:%s:%s\n", entries[i].tablename,entries[i].rowid, sql_template.select_sql);
+					continue;
+				}
 
             //OCI_Lob *srcLobList[MAX_COLUMNS], *dstLobList[MAX_COLUMNS];
             OCI_Lob **srcLobList = malloc(sizeof(OCI_Lob *) * sql_template.column_count);
@@ -325,26 +386,36 @@ int main(void) {
                 hex_to_binary_sse3(srcLobList[col], &lobLen, dstLobList[col]);
             }
 
-		      fprintf(logf, "DEBUG: Executing SQL: %s\n", sql_template.lock_sql);
-            OCI_Prepare(stLock, sql_template.lock_sql);
-            OCI_BindString(stLock, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
-            OCI_Execute(stLock);
+		      //fprintf(logf, "DEBUG: Executing SQL: %s\n", sql_template.lock_sql);
+            //OCI_Prepare(stLock, sql_template.lock_sql);
+            //OCI_BindString(stLock, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
+            //OCI_Execute(stLock);
 
-		      fprintf(logf, "DEBUG: Executing SQL: %s\n", sql_template.update_sql);
+		      if (DEBUG) fprintf(logf, "DEBUG: Executing SQL: %s\n", sql_template.update_sql);
             OCI_Prepare(stUpd, sql_template.update_sql);
             OCI_BindString(stUpd, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
             for (int col = 0; col < column_count; ++col) {
                 snprintf(bind_blob_param, sizeof(bind_blob_param), ":%s", column_maps[col].blob_col);
-                OCI_BindLob(stUpd, bind_blob_param, dstLobList[col]);
+                if (! OCI_BindLob(stUpd, bind_blob_param, dstLobList[col]) ) {
+						  OCI_Error *err = OCI_GetLastError();
+						  fprintf(logf, "[OCI Error] %s\n", OCI_ErrorGetString(err));
+				        fprintf(logf, "[C2B Bind]:%s:%s:%s\n", entries[i].tablename,entries[i].rowid, sql_template.update_sql);
+						  continue;
+					 }
             }
-            OCI_Execute(stUpd);
 
-            for (int i = 0; i < column_count; ++i) {
-                if (srcLobList[i]) OCI_LobFree(srcLobList[i]);
-                if (dstLobList[i]) OCI_LobFree(dstLobList[i]);
-            }
-            free(srcLobList);
-            free(dstLobList);
+            if (!OCI_Execute(stUpd)) {
+					 //OCI_Error *err = OCI_GetLastError();
+				    fprintf(logf, "[C2B Exec stUpd]:%s:%s\n", entries[i].tablename,entries[i].rowid);
+				    // Free LOBs
+                free_lobs(srcLobList, column_count);
+                free_lobs(dstLobList, column_count);
+					 continue;
+				}
+
+				// Free LOBs
+            free_lobs(srcLobList, column_count);
+            free_lobs(dstLobList, column_count);
 
         }
 
@@ -352,13 +423,16 @@ int main(void) {
 
         if (stSel) OCI_StatementFree(stSel);
         if (stUpd) OCI_StatementFree(stUpd);
-        if (stLock) OCI_StatementFree(stLock);
+        //if (stLock) OCI_StatementFree(stLock);
 
 	 }
 
     OCI_ConnectionFree(cn);
     OCI_Cleanup();
     fclose(logf);
+
+	 printf("\nlog file: %s/pid_%d.log\n\n", LOG_DIR, getpid());
+
     return 0;
 }
 
