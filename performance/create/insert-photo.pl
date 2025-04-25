@@ -114,17 +114,21 @@ $id++;
 
 print "ID: $id\n";
 
-$sql=q{insert into blobsource(id, name, b1) values(?,?,?)};
+$sql=q{insert into blobsource(id, name, b1,c1) values(?,?,?,?)};
 $sth = $dbh->prepare($sql,{ora_check_sql => 0});
 $sth->bind_param(1,$id);
 $sth->bind_param(2,$imageName);
+$sth->bind_param(3,$photo,{ora_type=>SQLT_BIN});
+
 if ($insertAsCLOB) {
 	my $hex = uc unpack 'H*', $photo;
 	print "len: " . length($hex) . "\n";
-	$sth->bind_param(3,$hex);
+	$sth->bind_param(4,$hex);
 } else {
-	$sth->bind_param(3,$photo,{ora_type=>SQLT_BIN});
+	#$sth->bind_param(4,'empty_clob()',{ora_type=>SQLT_CLOB});
+	$sth->bind_param(4,'empty_clob()');
 }
+
 $sth->execute();
 $sth->finish;
 

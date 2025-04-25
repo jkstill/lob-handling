@@ -1,7 +1,7 @@
 
 
 #export ezName=ora192rac-scan/pdb1.jks.com
-export ezName=lestrade/pdb01
+export ezName=lestrade/orcl1901
 
 
 

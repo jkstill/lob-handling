@@ -18,7 +18,7 @@ do
 	for imageFile in ../images/*.jpg ../images/small/*.jpg
 	do
 		imageName="$(basename $imageFile | cut -f1 -d\.)-${imageNumber}.jpg"
-		./insert-photo.pl --database $ezName --username jkstill --password grok --input-file $imageFile --image-name $imageName
+		./insert-photo.pl --database $ezName --username blobtest --password blobtest -insert-as-clob --input-file $imageFile --image-name $imageName
 	done
 done
 

@@ -1,4 +1,4 @@
 username:blobtest
 password:blobtest
-database://lestrade:1521/pdb01
+database://lestrade:1521/orcl1901
 hostname:lestrade

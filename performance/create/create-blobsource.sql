@@ -4,7 +4,8 @@ drop table blobsource cascade constraints purge;
 create table blobsource (
 	id number primary key not null,
 	name varchar2(64) not null,	
-	b1 blob not null
+	b1 blob not null,
+	c1 clob
 );
 
 

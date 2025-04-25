@@ -11,7 +11,7 @@ update
 
 update blobdest2
 set c2 = empty_clob()
-where id in (15, 27)
+where id in (15, 27, 415, 427, 815, 827, 1215, 1227, 1815, 1827, 2215, 2227, 2615, 2627, 3015, 3027)
 /
 
 commit;
