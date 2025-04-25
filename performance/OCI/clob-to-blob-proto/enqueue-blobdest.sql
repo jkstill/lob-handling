@@ -6,6 +6,9 @@ grant executed on dbms_aq to user
 
 */
 
+var max_rows number;
+exec : max_rows := 5000;
+
 DECLARE
    enqueue_options     DBMS_AQ.ENQUEUE_OPTIONS_T;
    message_properties  DBMS_AQ.MESSAGE_PROPERTIES_T;
@@ -15,7 +18,12 @@ BEGIN
 
    message := AQ$_JMS_TEXT_MESSAGE(NULL, NULL); -- or use the constructor with text later
 
-   FOR trec IN (SELECT 'BLOBDEST' tablename, rowid row_id FROM blobdest) LOOP
+   FOR trec IN (
+		SELECT 'BLOBDEST' tablename, rowid row_id
+			FROM blobdest 
+			WHERE dbms_lob.getlength(b1) = 0
+			and rownum <= :max_rows
+   ) LOOP
 
       message.text_vc := trec.tablename || ':' || trec.row_id;
 
