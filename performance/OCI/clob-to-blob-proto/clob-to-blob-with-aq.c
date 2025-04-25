@@ -16,6 +16,7 @@
 #define CREDENTIAL_FILE "ora-creds.txt"
 #define DEBUG 1
 
+OCI_Statement *stLoadColumnMetadata = NULL;
 
 typedef struct {
     char tablename[128];
@@ -104,15 +105,9 @@ int read_credentials(const char *filename, OraCredentials *out) {
     return 1;
 }
 
-int load_column_metadata(OCI_Connection *cn, const char *tablename, FILE *logf) {
+int load_column_metadata(OCI_Connection *cn, OCI_Statement *st, const char *tablename, FILE *logf) {
 
-	 OCI_Statement *st  = OCI_StatementCreate(cn);
-
-    if(!OCI_Prepare(st, "SELECT clob_column_name, blob_column_name FROM clob_to_blob_columns WHERE tablename = :tbl ORDER BY column_id")) {
-        OCI_Error *err = OCI_GetLastError();
-        fprintf(logf, "[OCI_Prepare st] %s\n", OCI_ErrorGetString(err));
-        return 1;
-    }
+    OCI_AllowRebinding(st, TRUE);
 	 
     OCI_Resultset *rs;
     column_count = 0;
@@ -328,6 +323,16 @@ int main(void) {
 		  return 1;
 	 }
 
+    stLoadColumnMetadata = OCI_StatementCreate(cn);
+
+    if(!OCI_Prepare(stLoadColumnMetadata, "SELECT clob_column_name, blob_column_name FROM clob_to_blob_columns WHERE tablename = :tbl ORDER BY column_id")) {
+        OCI_Error *err = OCI_GetLastError();
+        fprintf(logf, "[OCI_Prepare st] %s\n", OCI_ErrorGetString(err));
+        return 1;
+    }
+	 
+    OCI_AllowRebinding(stLoadColumnMetadata, TRUE);
+
     //OCI_Statement *st = OCI_StatementCreate(cn);
     //OCI_ExecuteStmt(st, "alter session set tracefile_identifier = 'CLOBTOBLOB' ");
     //OCI_ExecuteStmt(st, "alter session set events '10046 trace name context forever, level 12'");
@@ -362,7 +367,7 @@ int main(void) {
 					 if (DEBUG) fprintf(logf, "   DEBUG: Loading metadata for table: %s\n", entries[i].tablename);
 					 if (DEBUG) fprintf(logf, "   DEBUG: Last table: %s Current table: %s \n", last_tablename, entries[i].tablename);
 
-                if (!load_column_metadata(cn, entries[i].tablename, logf)) {
+                if (!load_column_metadata(cn, stLoadColumnMetadata, entries[i].tablename, logf)) {
 					     OCI_Error *err = OCI_GetLastError();
 					     fprintf(logf, "[called load_column_metadata]  %s\n", OCI_ErrorGetString(err));
 						  exit_code = 1;

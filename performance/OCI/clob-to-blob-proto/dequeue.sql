@@ -11,8 +11,8 @@ BEGIN
 	dequeue_options.wait := DBMS_AQ.NO_WAIT;
 	dequeue_options.visibility := DBMS_AQ.IMMEDIATE;
 
-	--for i in 1..100 loop	
-	while true loop
+	for i in 1..350 loop	
+	--while true loop
 
 		DBMS_AQ.DEQUEUE(
 			queue_name          => 'clob_to_blob_queue',

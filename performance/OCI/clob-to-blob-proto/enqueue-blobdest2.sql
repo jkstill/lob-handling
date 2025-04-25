@@ -6,6 +6,10 @@ grant executed on dbms_aq to user
 
 */
 
+var max_rows number;
+
+exec :max_rows := 10;
+
 DECLARE
    enqueue_options     DBMS_AQ.ENQUEUE_OPTIONS_T;
    message_properties  DBMS_AQ.MESSAGE_PROPERTIES_T;
@@ -18,7 +22,8 @@ BEGIN
    FOR trec IN (
 		SELECT 'BLOBDEST2' tablename, rowid row_id
 		FROM blobdest2
-		where dbms_lob.getlength(c1) + dbms_lob.getlength(c2) > 0
+		WHERE dbms_lob.getlength(c1) + dbms_lob.getlength(c2) > 0
+		and rownum <= :max_rows
 	) LOOP
 
       message.text_vc := trec.tablename || ':' || trec.row_id;
