@@ -7,7 +7,7 @@ grant executed on dbms_aq to user
 */
 
 var max_rows number;
-exec : max_rows := 10;
+exec : max_rows := 1000;
 
 DECLARE
    enqueue_options     DBMS_AQ.ENQUEUE_OPTIONS_T;
