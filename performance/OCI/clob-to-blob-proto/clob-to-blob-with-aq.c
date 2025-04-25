@@ -16,6 +16,9 @@
 #define CREDENTIAL_FILE "ora-creds.txt"
 #define DEBUG 1
 
+#define OCI_REBINDING_ENABLED TRUE
+
+OCI_Statement *stLoadColumnMetadata = NULL;
 
 typedef struct {
     char tablename[128];
@@ -104,28 +107,18 @@ int read_credentials(const char *filename, OraCredentials *out) {
     return 1;
 }
 
-int load_column_metadata(OCI_Connection *cn, const char *tablename, FILE *logf) {
+int load_column_metadata(OCI_Connection *cn, OCI_Statement *st, const char *tablename, FILE *logf) {
 
-	 OCI_Statement *st  = OCI_StatementCreate(cn);
-
-    if(!OCI_Prepare(st, "SELECT clob_column_name, blob_column_name FROM clob_to_blob_columns WHERE tablename = :tbl ORDER BY column_id")) {
-        OCI_Error *err = OCI_GetLastError();
-        fprintf(logf, "[OCI_Prepare st] %s\n", OCI_ErrorGetString(err));
-        return 1;
-    }
-	 
     OCI_Resultset *rs;
     column_count = 0;
 
     if (!OCI_BindString(st, ":tbl", (otext *)tablename, (unsigned int)strlen(tablename))){
         fprintf(logf, "[load_column_metadata] Column metadata bind failed for table: %s\n", tablename);
-        OCI_StatementFree(st);
         return 0;
 	 }
 
     if (!OCI_Execute(st)) {
         fprintf(logf, "[load_column_metadata] Column metadata query failed for table: %s\n", tablename);
-        OCI_StatementFree(st);
         return 0;
     }
 
@@ -139,8 +132,6 @@ int load_column_metadata(OCI_Connection *cn, const char *tablename, FILE *logf) 
             column_count++;
         }
     }
-
-    OCI_StatementFree(st);
 
     if (column_count == 0) {
         fprintf(logf, "No CLOB/BLOB column pairs found for table: %s\n", tablename);
@@ -292,14 +283,6 @@ void err_handler(OCI_Error *err)
 }
 
 
-int free_lobs(OCI_Lob **lobs, int count) {
-	 for (int i = 0; i < count; ++i) {
-		  if (lobs[i]) OCI_LobFree(lobs[i]);
-	 }
-    if (lobs) free(lobs);
-	 return 1;
-}
-
 int main(void) {
 
 	 int exit_code = 0;
@@ -328,12 +311,25 @@ int main(void) {
 		  return 1;
 	 }
 
+    stLoadColumnMetadata = OCI_StatementCreate(cn);
+    OCI_AllowRebinding(stLoadColumnMetadata, OCI_REBINDING_ENABLED);
+
+    if(!OCI_Prepare(stLoadColumnMetadata, "SELECT clob_column_name, blob_column_name FROM clob_to_blob_columns WHERE tablename = :tbl ORDER BY column_id")) {
+        OCI_Error *err = OCI_GetLastError();
+        fprintf(logf, "[OCI_Prepare st] %s\n", OCI_ErrorGetString(err));
+        return 1;
+    }
+	 
+
     //OCI_Statement *st = OCI_StatementCreate(cn);
     //OCI_ExecuteStmt(st, "alter session set tracefile_identifier = 'CLOBTOBLOB' ");
     //OCI_ExecuteStmt(st, "alter session set events '10046 trace name context forever, level 12'");
 
     OCI_Statement *stSel = OCI_StatementCreate(cn);
     OCI_Statement *stUpd = OCI_StatementCreate(cn);
+
+    OCI_Lob **srcLobList = malloc(sizeof(OCI_Lob *) * MAX_COLUMNS);
+    OCI_Lob **dstLobList = malloc(sizeof(OCI_Lob *) * MAX_COLUMNS);
 
     while (1) {
 
@@ -362,7 +358,7 @@ int main(void) {
 					 if (DEBUG) fprintf(logf, "   DEBUG: Loading metadata for table: %s\n", entries[i].tablename);
 					 if (DEBUG) fprintf(logf, "   DEBUG: Last table: %s Current table: %s \n", last_tablename, entries[i].tablename);
 
-                if (!load_column_metadata(cn, entries[i].tablename, logf)) {
+                if (!load_column_metadata(cn, stLoadColumnMetadata, entries[i].tablename, logf)) {
 					     OCI_Error *err = OCI_GetLastError();
 					     fprintf(logf, "[called load_column_metadata]  %s\n", OCI_ErrorGetString(err));
 						  exit_code = 1;
@@ -385,7 +381,9 @@ int main(void) {
 					    It is not genarally a good idea to reparse the same statement in a loop
 						 However, if that is not done, the OCILib raises and error that the value is 'already binded to the statement'
 						 There is no provision in OCILib to unbind a value from a statement
-						 There are no good workarounds for this while continuing to use OCILib
+						 The OCI_AllowRebinding function can used to allow rebinding 
+						 It has worked in simple test cases, and for load_column_metadata
+						 But I have not had success with it in the main loop
 					 */
 
                 if (!OCI_Prepare(stSel, sql_template.select_sql)) {
@@ -437,9 +435,6 @@ int main(void) {
 					 break;
 				}
 
-            //OCI_Lob *srcLobList[MAX_COLUMNS], *dstLobList[MAX_COLUMNS];
-            OCI_Lob **srcLobList = malloc(sizeof(OCI_Lob *) * sql_template.column_count);
-            OCI_Lob **dstLobList = malloc(sizeof(OCI_Lob *) * sql_template.column_count);
 
             char bind_blob_param[64];
 
@@ -452,7 +447,6 @@ int main(void) {
 					 if (DEBUG) fprintf(logf, "      DEBUG: CLOB size: %s:%d\n", column_maps[col].clob_col, lobLen);
                 hex_to_binary_sse3(srcLobList[col], &lobLen, dstLobList[col]);
             }
-
 
 		      if (DEBUG) fprintf(logf, "   DEBUG: Executing SQL: %s\n", sql_template.update_sql);
 
@@ -489,30 +483,43 @@ int main(void) {
             }
 
             if (!OCI_Execute(stUpd)) {
-					 //OCI_Error *err = OCI_GetLastError();
-				    fprintf(logf, "[C2B Exec stUpd]:%s:%s\n", entries[i].tablename,entries[i].rowid);
+                OCI_Error *err = OCI_GetLastError();
+                fprintf(logf, "[C2B Exec error stUpd] %s\n", OCI_ErrorGetString(err));
+				    fprintf(logf, "[C2B Exec stUpd]:%s:%s:%s\n", entries[i].tablename,entries[i].rowid, sql_template.update_sql);
 				    exit_code = 1;
 					 break;
 				}
 
 
-				// Free LOBs
-            free_lobs(srcLobList, column_count);
-            free_lobs(dstLobList, column_count);
-
+            for (int i = 0; i < column_count; ++i) {
+                if (dstLobList[i]) {
+                    OCI_LobFree(dstLobList[i]);
+                    dstLobList[i] = NULL;
+                }
+                srcLobList[i] = NULL; // makes sure you don't use stale pointers
+            }
 
         }
 
         OCI_Commit(cn);
 
+        free(entries);
+
 	 }
+
 
 	 // free the statement handles
     if (stSel) OCI_StatementFree(stSel);
     if (stUpd) OCI_StatementFree(stUpd);
+    if (stLoadColumnMetadata) OCI_StatementFree(stLoadColumnMetadata);
 
-	 // this causes segfault, not sure why
-    //if (stColumnMetadata) OCI_StatementFree(stColumnMetadata);
+    for (int i = 0; i < column_count; ++i) {
+        if (dstLobList[i]) OCI_LobFree(dstLobList[i]);
+        dstLobList[i] = NULL;
+        srcLobList[i] = NULL;
+    }
+    free(srcLobList);
+    free(dstLobList);
 
     OCI_ConnectionFree(cn);
     OCI_Cleanup();
