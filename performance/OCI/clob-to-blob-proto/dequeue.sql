@@ -1,6 +1,9 @@
 
 set serveroutput on size unlimited
 
+var max_rows number;
+exec :max_rows := 5000;
+
 DECLARE
   dequeue_options     DBMS_AQ.DEQUEUE_OPTIONS_T;
   message_properties  DBMS_AQ.MESSAGE_PROPERTIES_T;
@@ -11,7 +14,7 @@ BEGIN
 	dequeue_options.wait := DBMS_AQ.NO_WAIT;
 	dequeue_options.visibility := DBMS_AQ.IMMEDIATE;
 
-	for i in 1..350 loop	
+	for i in 1..:max_rows loop	
 	--while true loop
 
 		DBMS_AQ.DEQUEUE(
