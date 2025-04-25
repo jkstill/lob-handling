@@ -16,6 +16,7 @@
 #define CREDENTIAL_FILE "ora-creds.txt"
 #define DEBUG 1
 
+
 typedef struct {
     char tablename[128];
     char rowid[64];
@@ -104,15 +105,26 @@ int read_credentials(const char *filename, OraCredentials *out) {
 }
 
 int load_column_metadata(OCI_Connection *cn, const char *tablename, FILE *logf) {
-    OCI_Statement *st = OCI_StatementCreate(cn);
+
+	 OCI_Statement *st  = OCI_StatementCreate(cn);
+
+    if(!OCI_Prepare(st, "SELECT clob_column_name, blob_column_name FROM clob_to_blob_columns WHERE tablename = :tbl ORDER BY column_id")) {
+        OCI_Error *err = OCI_GetLastError();
+        fprintf(logf, "[OCI_Prepare st] %s\n", OCI_ErrorGetString(err));
+        return 1;
+    }
+	 
     OCI_Resultset *rs;
     column_count = 0;
 
-    OCI_Prepare(st, "SELECT clob_column_name, blob_column_name FROM clob_to_blob_columns WHERE tablename = :tbl ORDER BY column_id");
-    OCI_BindString(st, ":tbl", (otext *)tablename, (unsigned int)strlen(tablename));
+    if (!OCI_BindString(st, ":tbl", (otext *)tablename, (unsigned int)strlen(tablename))){
+        fprintf(logf, "[load_column_metadata] Column metadata bind failed for table: %s\n", tablename);
+        OCI_StatementFree(st);
+        return 0;
+	 }
 
     if (!OCI_Execute(st)) {
-        fprintf(logf, "Column metadata query failed for table: %s\n", tablename);
+        fprintf(logf, "[load_column_metadata] Column metadata query failed for table: %s\n", tablename);
         OCI_StatementFree(st);
         return 0;
     }
@@ -141,17 +153,29 @@ int load_column_metadata(OCI_Connection *cn, const char *tablename, FILE *logf) 
 int generate_sql_templates(const char *tablename, FILE *logf) {
     char select_buf[2048] = {0};
     char update_buf[2048] = {0};
-    char lock_buf[256] = {0};
 
-    strcpy(select_buf, "SELECT id");
-    strcpy(update_buf, "UPDATE ");
+	 // get PID and cast to string
+	 // this is a hack to get a unique identifier for the log file
+	 // it is not used in the SQL
+	 int pid = getpid();
+	 char pid_str[16];
+	 snprintf(pid_str, sizeof(pid_str), "%d", pid);
+
+	 snprintf(select_buf, sizeof(select_buf), "SELECT /*+ PID: %s */ ", pid_str);
+	 snprintf(update_buf, sizeof(update_buf), "UPDATE /*+ PID: %s */ ", pid_str);
+
     strcat(update_buf, tablename);
     strcat(update_buf, " SET ");
 
     for (int i = 0; i < column_count; ++i) {
         char sel_snip[128];
         char upd_snip[256];
-        snprintf(sel_snip, sizeof(sel_snip), ", %s", column_maps[i].clob_col);
+		  if ( i == 0 ) {
+				snprintf(sel_snip, sizeof(sel_snip), " %s", column_maps[i].clob_col);
+		  } else {
+				snprintf(sel_snip, sizeof(sel_snip), ", %s", column_maps[i].clob_col);
+		  }
+
         strncat(select_buf, sel_snip, sizeof(select_buf) - strlen(select_buf) - 1);
         snprintf(upd_snip, sizeof(upd_snip), "%s = :%s", column_maps[i].blob_col, column_maps[i].blob_col);
         strncat(update_buf, upd_snip, sizeof(update_buf) - strlen(update_buf) - 1);
@@ -160,7 +184,6 @@ int generate_sql_templates(const char *tablename, FILE *logf) {
     }
 
 
-    snprintf(lock_buf, sizeof(lock_buf), "SELECT 1 FROM %s WHERE rowid = :row_id FOR UPDATE", tablename);
     strcat(select_buf, " FROM ");
     strcat(select_buf, tablename);
     strcat(select_buf, " WHERE rowid = :row_id");
@@ -170,16 +193,14 @@ int generate_sql_templates(const char *tablename, FILE *logf) {
 
     strncpy(sql_template.select_sql, select_buf, sizeof(sql_template.select_sql));
     strncpy(sql_template.update_sql, update_buf, sizeof(sql_template.update_sql));
-    strncpy(sql_template.lock_sql, lock_buf, sizeof(sql_template.lock_sql));
     sql_template.column_count = column_count;
 
     char sql_log_file[256];
-    snprintf(sql_log_file, sizeof(sql_log_file), LOG_DIR "/sqlgen_%s.log", tablename);
+    snprintf(sql_log_file, sizeof(sql_log_file), LOG_DIR "/sqlgen_%s-%s.log", pid_str, tablename);
     FILE *sqlf = fopen(sql_log_file, "w");
     if (sqlf) {
         fprintf(sqlf, "-- Auto-generated SQL for table: %s\n\n", tablename);
         fprintf(sqlf, "SELECT:\n%s\n\n", sql_template.select_sql);
-        fprintf(sqlf, "LOCK:\n%s\n\n", sql_template.lock_sql);
         fprintf(sqlf, "UPDATE:\n%s\n\n", sql_template.update_sql);
         fclose(sqlf);
     } else {
@@ -280,9 +301,14 @@ int free_lobs(OCI_Lob **lobs, int count) {
 }
 
 int main(void) {
+
+	 int exit_code = 0;
+
     mkdir(LOG_DIR, 0777);
     FILE *logf = open_log_file();
     if (!logf || !read_credentials(CREDENTIAL_FILE, &creds)) return 1;
+	 // flush log file after each write
+	 setvbuf(logf, NULL, _IONBF, 0);
 
     //OCI_Initialize(oci_error_handler, NULL, OCI_ENV_DEFAULT|OCI_ENV_CONTEXT);
 	 
@@ -302,16 +328,12 @@ int main(void) {
 		  return 1;
 	 }
 
-
     //OCI_Statement *st = OCI_StatementCreate(cn);
     //OCI_ExecuteStmt(st, "alter session set tracefile_identifier = 'CLOBTOBLOB' ");
     //OCI_ExecuteStmt(st, "alter session set events '10046 trace name context forever, level 12'");
 
-    // Placeholder logic: fill these with real dequeued values
-    //QueueEntry entries[1] = {{"WFASSIGNMENT", "AAARkJAAEAAAMTEAAA"}};
-    //int num_entries = 1;
-	 //
-
+    OCI_Statement *stSel = OCI_StatementCreate(cn);
+    OCI_Statement *stUpd = OCI_StatementCreate(cn);
 
     while (1) {
 
@@ -330,47 +352,89 @@ int main(void) {
 
         fprintf(logf, "Dequeued %d messages from the queue.\n", num_entries);
 
-        OCI_Statement *stSel = OCI_StatementCreate(cn);
-        //OCI_Statement *stLock = OCI_StatementCreate(cn);
-        OCI_Statement *stUpd = OCI_StatementCreate(cn);
+		  if (DEBUG) fprintf(logf, "DEBUG: top of main loop:\n");
 
         for (int i = 0; i < num_entries; ++i) {
+
+			   // do not parse unless we have a new table
+				// otherwise there is massive library lock contention with multiple clients parsing the same SQL
             if (strcmp(entries[i].tablename, last_tablename) != 0) {
-                if (!load_column_metadata(cn, entries[i].tablename, logf) || !generate_sql_templates(entries[i].tablename, logf)) continue;
+					 if (DEBUG) fprintf(logf, "   DEBUG: Loading metadata for table: %s\n", entries[i].tablename);
+					 if (DEBUG) fprintf(logf, "   DEBUG: Last table: %s Current table: %s \n", last_tablename, entries[i].tablename);
+
+                if (!load_column_metadata(cn, entries[i].tablename, logf)) {
+					     OCI_Error *err = OCI_GetLastError();
+					     fprintf(logf, "[called load_column_metadata]  %s\n", OCI_ErrorGetString(err));
+						  exit_code = 1;
+						  break;
+                }
+
+                if (!generate_sql_templates(entries[i].tablename, logf)) {
+					     OCI_Error *err = OCI_GetLastError();
+					     fprintf(logf, "[generate_sql_templates] %s\n", OCI_ErrorGetString(err));
+						  exit_code = 1;
+						  break;
+					 }
+
+            }
                 //strncpy(last_tablename, entries[i].tablename, sizeof(last_tablename));
 				    strncpy(last_tablename, entries[i].tablename, sizeof(last_tablename) - 1);
                 last_tablename[sizeof(last_tablename) - 1] = '\0';
-            }
 
-		      if (DEBUG) fprintf(logf, "DEBUG: Executing SQL: %s|\n", sql_template.select_sql);
-            if (!OCI_Prepare(stSel, sql_template.select_sql)) {
-					 OCI_Error *err = OCI_GetLastError();
-					 fprintf(logf, "[OCI_Prepare stSel] %s:%s\n", OCI_ErrorGetString(err),sql_template.select_sql);
-				    continue;
-            }
+					 /*
+					    It is not genarally a good idea to reparse the same statement in a loop
+						 However, if that is not done, the OCILib raises and error that the value is 'already binded to the statement'
+						 There is no provision in OCILib to unbind a value from a statement
+						 There are no good workarounds for this while continuing to use OCILib
+					 */
 
-            //OCI_BindString(stSel, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
-		      if (!OCI_BindString(stSel, ":row_id", (otext *)entries[i].rowid, (unsigned int)(strlen(entries[i].rowid) + 1))) {
-					 OCI_Error *err = OCI_GetLastError();
-					 fprintf(logf, "[OCI_BindString stSel] %s:%s:%s\n", OCI_ErrorGetString(err),entries[i].rowid, sql_template.select_sql);
-				    continue;
-            }
+                if (!OCI_Prepare(stSel, sql_template.select_sql)) {
+					     OCI_Error *err = OCI_GetLastError();
+					     fprintf(logf, "[OCI_Prepare stSel] %s:%s\n", OCI_ErrorGetString(err),sql_template.select_sql);
+						  exit_code = 1;
+						  break;
+                }
 
-		      if (DEBUG) fprintf(logf, "DEBUG: RowId: %s|\n", entries[i].rowid);
+		          if (DEBUG) fprintf(logf, "   DEBUG: RowId parse: %s|\n", entries[i].rowid);
 
+		          if (!OCI_BindString(stSel, ":row_id", (otext *)entries[i].rowid, (unsigned int)(strlen(entries[i].rowid) + 1))) {
+					     OCI_Error *err = OCI_GetLastError();
+                    fprintf(logf, "[OCI Error stSel rowid] %s\n", OCI_ErrorGetString(err));
+					     fprintf(logf, "[OCI_BindString stSel rowid] %s:%s\n", entries[i].rowid, sql_template.select_sql);
+						  exit_code = 1;
+						  break;
+                }
+
+		      if (DEBUG) {
+					fprintf(logf, "   DEBUG: Executing SQL: %s|\n", sql_template.select_sql);
+		         fprintf(logf, "   DEBUG: RowId execute: %s|\n", entries[i].rowid);
+				}
+
+            // an invalid rowid may be due to an message enqueued for a row that has been deleted
             if (!OCI_Execute(stSel)) {
+
+					 char *rowIdErrorString = "ORA-01410";
+
                 OCI_Error *err = OCI_GetLastError();
-                fprintf(logf, "[OCI Error] %s\n", OCI_ErrorGetString(err));
-				    fprintf(logf, "[C2B Exec stSel]:%s:%s:%s\n", entries[i].tablename,entries[i].rowid, sql_template.select_sql);
-				    continue;
+					 char *errString = (char *)OCI_ErrorGetString(err);
+
+                fprintf(logf, "[OCI Error stSel Execute] %s\n", errString);
+				    fprintf(logf, "[C2B Exec stSel Execute]:%s:%s:%s\n", entries[i].tablename,entries[i].rowid, sql_template.select_sql);
+
+					 if (strstr(errString, rowIdErrorString) == NULL) {
+	                 printf("\nlog file: %s/pid_%d.log\n\n", LOG_DIR, getpid());
+						  exit_code = 1;
+						  break;
+						}
 		      }
 
             OCI_Resultset *rs = OCI_GetResultset(stSel);
             if (!OCI_FetchNext(rs)) {
                 OCI_Error *err = OCI_GetLastError();
-                fprintf(logf, "[OCI Error] %s\n", OCI_ErrorGetString(err));
-				    fprintf(logf, "[C2B Fetch stSel]:%s:%s:%s\n", entries[i].tablename,entries[i].rowid, sql_template.select_sql);
-					continue;
+                fprintf(logf, "[OCI Error stSel FetchNext] %s\n", OCI_ErrorGetString(err));
+				    fprintf(logf, "[C2B Fetch stSel FetchNext]:%s:%s:%s\n", entries[i].tablename,entries[i].rowid, sql_template.select_sql);
+				    exit_code = 1;
+					 break;
 				}
 
             //OCI_Lob *srcLobList[MAX_COLUMNS], *dstLobList[MAX_COLUMNS];
@@ -380,52 +444,75 @@ int main(void) {
             char bind_blob_param[64];
 
             for (int col = 0; col < column_count; ++col) {
-                srcLobList[col] = OCI_GetLob(rs, col + 2);
+		          if (DEBUG) fprintf(logf, "      DEBUG: call hex_to_binary: %s\n", column_maps[col].clob_col);
+                srcLobList[col] = OCI_GetLob(rs, col + 1);
                 dstLobList[col] = OCI_LobCreate(cn, OCI_BLOB);
                 unsigned int lobLen = OCI_LobGetLength(srcLobList[col]);
+					 // log the size
+					 if (DEBUG) fprintf(logf, "      DEBUG: CLOB size: %s:%d\n", column_maps[col].clob_col, lobLen);
                 hex_to_binary_sse3(srcLobList[col], &lobLen, dstLobList[col]);
             }
 
-		      //fprintf(logf, "DEBUG: Executing SQL: %s\n", sql_template.lock_sql);
-            //OCI_Prepare(stLock, sql_template.lock_sql);
-            //OCI_BindString(stLock, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
-            //OCI_Execute(stLock);
 
-		      if (DEBUG) fprintf(logf, "DEBUG: Executing SQL: %s\n", sql_template.update_sql);
-            OCI_Prepare(stUpd, sql_template.update_sql);
-            OCI_BindString(stUpd, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid));
+		      if (DEBUG) fprintf(logf, "   DEBUG: Executing SQL: %s\n", sql_template.update_sql);
+
+            if (!OCI_Prepare(stUpd, sql_template.update_sql)) {
+					 OCI_Error *err = OCI_GetLastError();
+					 fprintf(logf, "[OCI_Prepare stUpd] %s:%s\n", OCI_ErrorGetString(err),sql_template.update_sql);
+				    exit_code = 1;
+					 break;
+		      }
+
+
+            if (!OCI_BindString(stUpd, ":row_id", entries[i].rowid, (unsigned int)strlen(entries[i].rowid))) {
+
+					 OCI_Error *err = OCI_GetLastError();
+				    fprintf(logf, "[OCI Error stUpd] %s\n", OCI_ErrorGetString(err));
+					 fprintf(logf, "[OCI_BindString stUpd] %s:%s\n", entries[i].rowid, sql_template.update_sql);
+				    exit_code = 1;
+					 break;
+				}
+
             for (int col = 0; col < column_count; ++col) {
+
+		          if (DEBUG) fprintf(logf, "      DEBUG: C2B bind column: %s\n", column_maps[col].blob_col);
+
                 snprintf(bind_blob_param, sizeof(bind_blob_param), ":%s", column_maps[col].blob_col);
+
                 if (! OCI_BindLob(stUpd, bind_blob_param, dstLobList[col]) ) {
 						  OCI_Error *err = OCI_GetLastError();
 						  fprintf(logf, "[OCI Error] %s\n", OCI_ErrorGetString(err));
 				        fprintf(logf, "[C2B Bind]:%s:%s:%s\n", entries[i].tablename,entries[i].rowid, sql_template.update_sql);
-						  continue;
+				        exit_code = 1;
+					     break;
 					 }
             }
 
             if (!OCI_Execute(stUpd)) {
 					 //OCI_Error *err = OCI_GetLastError();
 				    fprintf(logf, "[C2B Exec stUpd]:%s:%s\n", entries[i].tablename,entries[i].rowid);
-				    // Free LOBs
-                free_lobs(srcLobList, column_count);
-                free_lobs(dstLobList, column_count);
-					 continue;
+				    exit_code = 1;
+					 break;
 				}
+
 
 				// Free LOBs
             free_lobs(srcLobList, column_count);
             free_lobs(dstLobList, column_count);
 
+
         }
 
         OCI_Commit(cn);
 
-        if (stSel) OCI_StatementFree(stSel);
-        if (stUpd) OCI_StatementFree(stUpd);
-        //if (stLock) OCI_StatementFree(stLock);
-
 	 }
+
+	 // free the statement handles
+    if (stSel) OCI_StatementFree(stSel);
+    if (stUpd) OCI_StatementFree(stUpd);
+
+	 // this causes segfault, not sure why
+    //if (stColumnMetadata) OCI_StatementFree(stColumnMetadata);
 
     OCI_ConnectionFree(cn);
     OCI_Cleanup();
@@ -433,6 +520,6 @@ int main(void) {
 
 	 printf("\nlog file: %s/pid_%d.log\n\n", LOG_DIR, getpid());
 
-    return 0;
+    return exit_code;
 }
 
