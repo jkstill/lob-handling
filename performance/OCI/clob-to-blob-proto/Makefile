@@ -34,8 +34,8 @@ clean:
 
 # create lsan suppressions file for Leak Sanitizer
 lsan:
-	echo "# suppressions for libclntsh.so" > $(LSAN_FILE)
-	echo "leak:libclntsh.so" >> $(LSAN_FILE)
+	@echo "# suppressions for libclntsh.so" > $(LSAN_FILE)
+	@echo "leak:libclntsh.so" >> $(LSAN_FILE)
 
 run:
 	# create lsan suppressions file if not exists
