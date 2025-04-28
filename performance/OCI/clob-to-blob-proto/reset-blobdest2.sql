@@ -2,6 +2,8 @@
 
 -- clear some c2 to make sure that clob-to-blob-aq correctly skips that column
 
+@@create-blobdest2
+
 update 
 	blobdest2 set 
 	b1 = empty_blob()

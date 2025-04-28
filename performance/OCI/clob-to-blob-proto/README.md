@@ -6,11 +6,11 @@ This utility converts CLOB columns containing hex-encoded data into BLOBs, using
 
 ## 📦 Components
 
-- `clob_to_blob.c` — Complete C source code using OCILib
+- `clob-to-blob.c` — Complete C source code using OCILib
 - `Makefile` — For building the binary
-- `create_queue.sql` — PL/SQL to create Oracle Advanced Queue
-- `enqueue_example.sql` — PL/SQL to enqueue test messages
-- `clob_to_blob_columns.sql` — Table schema for CLOB/BLOB column metadata
+- `create-queue.sql` — PL/SQL to create Oracle Advanced Queue
+- `enqueue-example.sql` — PL/SQL to enqueue test messages
+- `clob-to-blob-columns.sql` — Table schema for CLOB/BLOB column metadata
 
 ---
 
@@ -41,7 +41,7 @@ database:orcl
 ### 2. Run the Program
 
 ```bash
-./clob_to_blob
+./clob-to-blob
 ```
 
 This will:
@@ -65,26 +65,26 @@ This will:
 ### Create the AQ:
 
 ```sql
-@create_queue.sql
+@create-queue.sql
 ```
 
 ### Create Metadata Table:
 
 ```sql
-@clob_to_blob_columns.sql
+@clob-to-blob-columns.sql
 ```
 
 ### Enqueue Sample Message:
 
 ```sql
-@enqueue_example.sql
+@enqueue-example.sql
 ```
 
 ---
 
 ## ✅ Notes
 
-- Update `MAX_COLUMNS` and `MAX_BATCH_SIZE` in `clob_to_blob.c` as needed.
+- Update `MAX_COLUMNS` and `MAX_BATCH_SIZE` in `clob-to-blob.c` as needed.
 - Ensure your Oracle session has permissions for AQ and LOB updates.
 - The program commits each batch after processing.
 

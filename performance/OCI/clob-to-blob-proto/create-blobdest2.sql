@@ -17,7 +17,7 @@ select
 	, c1 as c2
 	, b1
 	, b1 as b2
-from blobdest
+from blobsource
 --where id < 31
 /
 
