@@ -129,6 +129,7 @@ int load_column_metadata(OCI_Connection *cn, OCI_Statement *st, const char *tabl
     while (OCI_FetchNext(rs) && column_count < MAX_COLUMNS) {
         const char *clob_col = OCI_GetString(rs, 1);
         const char *blob_col = OCI_GetString(rs, 2);
+		  // this needs an 'else' with a warning or error
         if (clob_col && blob_col) {
             strncpy(column_maps[column_count].clob_col, clob_col, sizeof(column_maps[column_count].clob_col));
             strncpy(column_maps[column_count].blob_col, blob_col, sizeof(column_maps[column_count].blob_col));
@@ -147,6 +148,9 @@ int load_column_metadata(OCI_Connection *cn, OCI_Statement *st, const char *tabl
 int generate_sql_templates(const char *tablename, FILE *logf) {
     char select_buf[2048] = {0};
     char update_buf[2048] = {0};
+
+	 // The SQL used to get the metadata for the CLOB/BLOB columns
+	 // SELECT clob_column_name, blob_column_name FROM clob_to_blob_columns WHERE tablename = :tbl ORDER BY column_id
 
 	 // get PID and cast to string
 	 // this is a hack to get a unique identifier for the log file

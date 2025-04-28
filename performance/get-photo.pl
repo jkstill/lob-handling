@@ -13,6 +13,7 @@ my %optctl = ();
 my($db, $username, $password);
 my ($help, $sysdba, $connectionMode, $localSysdba, $sysOper) = (0,0,0,0,0);
 my ($listPhotos, $photoName) = (0,'');
+my $outputDir = './photos';
 
 Getopt::Long::GetOptions(
 	\%optctl,
@@ -20,6 +21,7 @@ Getopt::Long::GetOptions(
 	"username=s"	=> \$username,
 	"password=s"	=> \$password,
 	"list-photos!"	=> \$listPhotos,
+	"output-dir=s"	=> \$outputDir,
 	"photo-name=s"	=> \$photoName,
 	"sysdba!"		=> \$sysdba,
 	"local-sysdba!"=> \$localSysdba,
@@ -85,7 +87,7 @@ my ($sql, $sth);
 print "LongReadLen: $dbh->{LongReadLen}\n";
 #
 if ($listPhotos) {
-	$sql = q{select id, name from blobdest order by id};
+	$sql = q{select id, name from blobdest2 order by id};
 	$sth = $dbh->prepare($sql);
 	$sth->execute;
 	while (my ($id, $name) = $sth->fetchrow_array) {
@@ -97,9 +99,9 @@ if ($listPhotos) {
 }
 
 
-$sql=q{select id, name, c1, b1 from blobdest where name = ?};
+$sql=q{select id, name, c1, b1 from blobdest2 where name = ?};
 
-my $sth = $dbh->prepare($sql, {ora_piece_lob=>1,ora_piece_size=> $oraPieceSize, ora_check_sql => 0});
+$sth = $dbh->prepare($sql, {ora_piece_lob=>1,ora_piece_size=> $oraPieceSize, ora_check_sql => 0});
 
 $sth->execute($photoName);
 
@@ -119,12 +121,12 @@ my $jpegBlob = $photoName; $jpegBlob =~ s/\.jpg$/-from-blob.jpg/;
 my $jpegClob = $photoName; $jpegClob =~ s/\.jpg$/-from-clob.jpg/;
 
 my $rawOutputFH = IO::File->new();
-$rawOutputFH->open($jpegBlob,'w');
+$rawOutputFH->open(qq{$outputDir/$jpegBlob},'w') or die "Cannot open $outputDir/$jpegBlob: $!";
 binmode $rawOutputFH, ':raw';
 $rawOutputFH->print($blob);
 
 $rawOutputFH = IO::File->new();
-$rawOutputFH->open($jpegClob,'w');
+$rawOutputFH->open(qq{$outputDir/$jpegClob},'w') or die "Cannot open $outputDir/$jpegClob: $!";
 binmode $rawOutputFH, ':raw';
 $rawOutputFH->print($raw);
 
