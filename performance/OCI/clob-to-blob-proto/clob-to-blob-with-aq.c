@@ -175,12 +175,16 @@ int generate_sql_templates(const char *tablename, FILE *logf) {
 		  }
 
         strncat(select_buf, sel_snip, sizeof(select_buf) - strlen(select_buf) - 1);
+		  // set BLOB to the :blob_col
         snprintf(upd_snip, sizeof(upd_snip), "%s = :%s", column_maps[i].blob_col, column_maps[i].blob_col);
         strncat(update_buf, upd_snip, sizeof(update_buf) - strlen(update_buf) - 1);
+		  // set the source CLOB to empty_clob()
+        snprintf(upd_snip, sizeof(upd_snip), ", %s = %s", column_maps[i].clob_col, "empty_clob()");
+        strncat(update_buf, upd_snip, sizeof(update_buf) - strlen(update_buf) - 1);
+
         if (i < column_count - 1)
             strncat(update_buf, ", ", sizeof(update_buf) - strlen(update_buf) - 1);
     }
-
 
     strcat(select_buf, " FROM ");
     strcat(select_buf, tablename);
@@ -295,7 +299,7 @@ int main(void) {
     struct timespec batch_start, batch_end;
 
 	 // per set of dequeued entries
-    double elapsed_sec = (batch_end.tv_sec - batch_start.tv_sec) + (batch_end.tv_nsec - batch_start.tv_nsec) / 1e9;
+    double elapsed_sec = 0.0; 
     double rows_per_sec = 0.0;
 
 	 // entire batch
