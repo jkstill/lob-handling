@@ -11,16 +11,18 @@ with data as (
 		, dbms_lob.getlength(b2) b2len
 		, dbms_lob.getlength(c2) c2len
 		, dbms_lob.getlength(c2)/2 c2destsize
-		, case dbms_lob.getlength(b1) - dbms_lob.getlength(c1)/2
-		when 0 then 'OK'
-		else 'ERROR in B1 BLOB Length'
-		end B1_check
-		, case dbms_lob.getlength(b2) - dbms_lob.getlength(c2)/2
-		when 0 then 'OK'
-		else 'ERROR in B2 BLOB Length'
-		end B2_check
+		, case dbms_lob.getlength(b1)
+		  when 0 then 'ERROR in B1 BLOB Length'
+		  when  NULL then 'B1 BLOB Length is NULL'
+        else 'OK'
+		end b1_check
+		, case dbms_lob.getlength(b2)
+		  when 0 then 'ERROR in B2 BLOB Length'
+		  when  NULL then 'B2 BLOB Length is NULL'
+        else 'OK'
+		end b2_check
 	from blobdest2
-	--where dbms_lob.getlength(b1) + dbms_lob.getlength(b2) > 0
+	where dbms_lob.getlength(b1) + dbms_lob.getlength(b2) > 0
 	--where rownum < 10
 	order by id
 )

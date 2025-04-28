@@ -88,10 +88,10 @@ $dbh->{RowCacheSize} = 100;
 #$dbh->{LongTruncOk}=1;
 
 my ($sql, $sth);
-print "LongReadLen: $dbh->{LongReadLen}\n";
+#print "LongReadLen: $dbh->{LongReadLen}\n";
 #
 if ($listPhotos) {
-	$sql = q{select id, name from blobdest2 order by id};
+	$sql = q{select id, name from blobdest order by id};
 	$sth = $dbh->prepare($sql);
 	$sth->execute;
 	while (my ($id, $name) = $sth->fetchrow_array) {
@@ -103,36 +103,39 @@ if ($listPhotos) {
 }
 
 
-$sql=q{select id, name, c1, b1 from blobdest2 where name = ?};
+# skip clob as it has been set to empty_clob()
+#$sql=q{select id, name, c1, b1 from blobdest where name = ?};
+$sql=q{select id, name, b1 from blobdest where name = ?};
 
 $sth = $dbh->prepare($sql, {ora_piece_lob=>1,ora_piece_size=> $oraPieceSize, ora_check_sql => 0});
 
 $sth->execute($photoName);
 
-my ($id, $name, $clob, $blob) = $sth->fetchrow_array();
+#my ($id, $name, $clob, $blob) = $sth->fetchrow_array();
+my ($id, $name, $blob) = $sth->fetchrow_array();
 #my ($id, $blob) = $sth->fetchrow_array();
 
 $sth->finish;
 $dbh->disconnect;
 
-my $raw = pack"H*",$clob;
+#my $raw = pack"H*",$clob;
 
-print " raw len: " . length($raw) . "\n";
-print "clob len: " . length($clob) . "\n";
+#print " raw len: " . length($raw) . "\n";
+#print "clob len: " . length($clob) . "\n";
 print "blob len: " . length($blob) . "\n";
 
 my $jpegBlob = $photoName; $jpegBlob =~ s/\.jpg$/-from-blob.jpg/;
-my $jpegClob = $photoName; $jpegClob =~ s/\.jpg$/-from-clob.jpg/;
+#my $jpegClob = $photoName; $jpegClob =~ s/\.jpg$/-from-clob.jpg/;
 
 my $rawOutputFH = IO::File->new();
 $rawOutputFH->open(qq{$outputDir/$jpegBlob},'w') or die "Cannot open $outputDir/$jpegBlob: $!";
 binmode $rawOutputFH, ':raw';
 $rawOutputFH->print($blob);
 
-$rawOutputFH = IO::File->new();
-$rawOutputFH->open(qq{$outputDir/$jpegClob},'w') or die "Cannot open $outputDir/$jpegClob: $!";
-binmode $rawOutputFH, ':raw';
-$rawOutputFH->print($raw);
+#$rawOutputFH = IO::File->new();
+#$rawOutputFH->open(qq{$outputDir/$jpegClob},'w') or die "Cannot open $outputDir/$jpegClob: $!";
+#binmode $rawOutputFH, ':raw';
+#$rawOutputFH->print($raw);
 
 
 sub usage {
