@@ -1,4 +1,7 @@
 
+#define _POSIX_C_SOURCE 200112L // for clock_gettime and timespec
+
+#include <time.h>   // for clock_gettime
 #include "ocilib.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,7 +12,7 @@
 #include <ctype.h>
 #include <emmintrin.h> // SSE3
 
-#define MAX_BATCH_SIZE 10
+#define MAX_BATCH_SIZE 5
 #define MAX_COLUMNS 8
 #define DATA_SIZE_BUF 100 * 1048576
 #define LOG_DIR "c2b-log"
@@ -126,6 +129,7 @@ int load_column_metadata(OCI_Connection *cn, OCI_Statement *st, const char *tabl
     while (OCI_FetchNext(rs) && column_count < MAX_COLUMNS) {
         const char *clob_col = OCI_GetString(rs, 1);
         const char *blob_col = OCI_GetString(rs, 2);
+		  // this needs an 'else' with a warning or error
         if (clob_col && blob_col) {
             strncpy(column_maps[column_count].clob_col, clob_col, sizeof(column_maps[column_count].clob_col));
             strncpy(column_maps[column_count].blob_col, blob_col, sizeof(column_maps[column_count].blob_col));
@@ -144,6 +148,9 @@ int load_column_metadata(OCI_Connection *cn, OCI_Statement *st, const char *tabl
 int generate_sql_templates(const char *tablename, FILE *logf) {
     char select_buf[2048] = {0};
     char update_buf[2048] = {0};
+
+	 // The SQL used to get the metadata for the CLOB/BLOB columns
+	 // SELECT clob_column_name, blob_column_name FROM clob_to_blob_columns WHERE tablename = :tbl ORDER BY column_id
 
 	 // get PID and cast to string
 	 // this is a hack to get a unique identifier for the log file
@@ -285,6 +292,16 @@ void err_handler(OCI_Error *err)
 
 int main(void) {
 
+    struct timespec batch_start, batch_end;
+
+	 // per set of dequeued entries
+    double elapsed_sec = (batch_end.tv_sec - batch_start.tv_sec) + (batch_end.tv_nsec - batch_start.tv_nsec) / 1e9;
+    double rows_per_sec = 0.0;
+
+	 // entire batch
+    double total_batch_time_sec = 0.0;
+    unsigned long long total_rows_processed = 0;
+
 	 int exit_code = 0;
 
     mkdir(LOG_DIR, 0777);
@@ -332,6 +349,8 @@ int main(void) {
     OCI_Lob **dstLobList = malloc(sizeof(OCI_Lob *) * MAX_COLUMNS);
 
     while (1) {
+
+        clock_gettime(CLOCK_MONOTONIC, &batch_start);
 
         QueueEntry *entries = malloc(sizeof(QueueEntry) * MAX_BATCH_SIZE);
         if (!entries) {
@@ -502,11 +521,21 @@ int main(void) {
         }
 
         OCI_Commit(cn);
-
         free(entries);
 
-	 }
+        clock_gettime(CLOCK_MONOTONIC, &batch_end);
+		  elapsed_sec = difftime(batch_end.tv_sec, batch_start.tv_sec) + (batch_end.tv_nsec - batch_start.tv_nsec)/1e9;
 
+        total_batch_time_sec += elapsed_sec;
+        total_rows_processed += num_entries;
+
+        if (num_entries > 0 && elapsed_sec > 0.0) {
+            rows_per_sec = num_entries / elapsed_sec;
+        }
+
+        fprintf(logf, "Batch timing: %.6f seconds for %d rows (%.2f rows/sec)\n", elapsed_sec, num_entries, rows_per_sec);
+
+	 }
 
 	 // free the statement handles
     if (stSel) OCI_StatementFree(stSel);
@@ -520,9 +549,17 @@ int main(void) {
     }
     free(srcLobList);
     free(dstLobList);
-
     OCI_ConnectionFree(cn);
     OCI_Cleanup();
+
+    if (total_rows_processed > 0) {
+        fprintf(logf, "\n--- Summary ---\n");
+        fprintf(logf, "Total rows processed: %llu\n", total_rows_processed);
+        fprintf(logf, "Total time: %.6f seconds\n", total_batch_time_sec);
+        fprintf(logf, "Average rows/sec: %.2f\n", total_rows_processed / total_batch_time_sec);
+        fprintf(logf, "Average seconds/row: %.6f\n", total_batch_time_sec / total_rows_processed);
+    }
+
     fclose(logf);
 
 	 printf("\nlog file: %s/pid_%d.log\n\n", LOG_DIR, getpid());
