@@ -8,7 +8,7 @@ grant executed on dbms_aq to user
 
 var max_rows number;
 exec :max_rows := 5000;
---exec :max_rows := 10;
+exec :max_rows := 10;
 
 DECLARE
    enqueue_options     DBMS_AQ.ENQUEUE_OPTIONS_T;
@@ -29,7 +29,7 @@ BEGIN
       message.text_vc := trec.tablename || ':' || trec.row_id;
 
       DBMS_AQ.ENQUEUE(
-         queue_name          => 'clob_to_blob_queue',
+         queue_name          => 'clob_to_blob_queue_001',
          enqueue_options     => enqueue_options,
          message_properties  => message_properties,
          payload             => message,

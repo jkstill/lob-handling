@@ -18,7 +18,7 @@ BEGIN
 	--while true loop
 
 		DBMS_AQ.DEQUEUE(
-			queue_name          => 'clob_to_blob_queue',
+			queue_name          => 'clob_to_blob_queue_001',
 			dequeue_options     => dequeue_options,
 			message_properties  => message_properties,
 			payload             => payload,
