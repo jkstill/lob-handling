@@ -6,20 +6,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <ctype.h>
+#include <getopt.h>
+
 #include <emmintrin.h> // SSE3
 
-#define MAX_BATCH_SIZE 5
+#define MAX_BATCH_SIZE 100
 #define MAX_COLUMNS 8
+// some of the CLOBs are very large
 #define DATA_SIZE_BUF 100 * 1048576
 #define LOG_DIR "c2b-log"
 #define CREDENTIAL_FILE "ora-creds.txt"
-#define DEBUG 1
 
 #define OCI_REBINDING_ENABLED TRUE
+
+int VERBOSE = 0;
+int DEBUG = 0;
+
+char q_number[32];
+
 
 OCI_Statement *stLoadColumnMetadata = NULL;
 
@@ -49,6 +58,84 @@ ColumnMap column_maps[MAX_COLUMNS];
 int column_count = 0;
 SQLTemplate sql_template;
 char last_tablename[128] = "";
+
+
+void usage(void) {
+   printf ("\
+Usage: getopt-long [OPTION] \
+\n\
+\n\
+-d --debug\n\
+-q --queue-id=QUEUE_ID\n\
+-h --help\n\
+\n");
+}
+
+int getopts(int argc, char **argv)
+{
+	int c;
+
+	while (1) {
+		int option_index = 0;
+		static struct option long_options[] = {
+			{"debug",     no_argument, 0,  'd' },
+			{"queue-id",  required_argument,0,  'q' },
+			{"help",    no_argument,       0, 'z'},
+			{0,         0,                 0,  0 }
+		};
+
+		c = getopt_long(argc, argv, "?zdhq:", long_options, &option_index);
+		if (c == -1)
+			break;
+
+		switch (c) {
+
+			case 'q':
+				printf("option q queue-id with value '%s'\n", optarg);
+				// convert char padded to width of 3 with leading zeros
+				snprintf(q_number, sizeof(q_number), "%03d", atoi(optarg));
+				break;
+
+			case 'd':
+				DEBUG = 1;
+				break;
+
+			case '?':
+				usage();
+				return (EXIT_FAILURE);
+			
+			case 'z':
+				usage();
+				return (EXIT_FAILURE);
+
+			case 'h':
+				usage();
+				return (EXIT_FAILURE);
+				
+			default:
+				printf("?? getopt returned character code 0%o ??\n", c);
+		}
+	}
+
+	if (optind < argc) {
+		printf("non-option ARGV-elements: ");
+		while (optind < argc)
+		printf("%s ", argv[optind++]);
+		printf("\n");
+		return(EXIT_SUCCESS);
+	}
+
+	// if any of the required options are missing, print usage and exit
+	// if the length of the queue number is not 3, print usage and exit
+	// if the queue number is not a number, print usage and exit
+	if ( strlen(q_number) != 3 ) {
+		fprintf(stderr, "Queue number must be between 0-999.\n");
+		usage();
+		return(EXIT_FAILURE);
+	}
+
+	return(EXIT_SUCCESS);
+}
 
 int hex_to_binary_sse3(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *binary_data) {
     size_t n;
@@ -220,7 +307,10 @@ int dequeue_batch(OCI_Connection *cn, QueueEntry *entries, int max_entries) {
         return 0;
     }
 
-    OCI_Dequeue *deq = OCI_DequeueCreate(type, "clob_to_blob_queue");
+	 // need to add queue number to the queue name
+	 char queue_name[64];
+	 snprintf(queue_name, sizeof(queue_name), "clob_to_blob_queue_%s", q_number);
+    OCI_Dequeue *deq = OCI_DequeueCreate(type, queue_name);
     if (!deq) {
         fprintf(stderr, "Failed to create AQ dequeue object.\n");
         return 0;
@@ -294,7 +384,12 @@ void err_handler(OCI_Error *err)
 }
 
 
-int main(void) {
+int main(int argc, char **argv) {
+
+	int getopts_success = getopts(argc, argv);
+	if (getopts_success != 0) {
+		exit(EXIT_FAILURE);
+	}
 
     struct timespec batch_start, batch_end;
 

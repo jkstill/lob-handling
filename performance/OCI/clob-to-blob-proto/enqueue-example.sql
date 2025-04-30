@@ -6,7 +6,7 @@ DECLARE
 BEGIN
   message := SYS.AQ$_JMS_TEXT_MESSAGE.construct;
   message.set_text('WFASSIGNMENT:AAARkJAAEAAAMTEAAA');
-  DBMS_AQ.ENQUEUE(queue_name => 'clob_to_blob_queue',
+  DBMS_AQ.ENQUEUE(queue_name => 'clob_to_blob_queue_001',
                   enqueue_options => enqueue_options,
                   message_properties => message_properties,
                   payload => message,
