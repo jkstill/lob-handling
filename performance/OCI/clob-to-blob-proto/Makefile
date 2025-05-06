@@ -7,7 +7,7 @@ LDFLAGS=-l:libocilib.a -lclntsh -L/usr/local/lib -L/u01/app/oracle/product/19c/l
 
 LSAN_FILE := lsan.supp
 
-# make clob-to-blob-with-aq
+# make clob-to-blob-aq
 c2b := clob-to-blob-aq
 # make clob-to-blob-with-aq-MODS
 c2b-mods := clob-to-blob-aq-MODS

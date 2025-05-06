@@ -8,7 +8,8 @@
 #include "testdata.h"
 #include "base16_decoding_table.h"
 
-#define TESTDATALEN 10000000
+//#define TESTDATALEN 10000000
+#define TESTDATALEN 2000000
 
 /* the resulting binary string is half the size of the input hex string
  * because every two hex characters map to one byte */
