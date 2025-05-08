@@ -3,7 +3,6 @@
 banner () {
 	echo
 	echo "==>> $@"
-	echo
 }
 
 banner "remove old data"

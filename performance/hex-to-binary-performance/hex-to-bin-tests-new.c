@@ -343,27 +343,27 @@ int main() {
     for (i = 0; i < TESTDATALEN/2; i++) {
         checksum += result[i];
     }
-    printf("checksum: %llu\n", checksum);
+    printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("arithmetic solution calcHex() took %f seconds\n", elapsed);
+    printf("arithmetic solution calcHex() took %3.6f seconds avg: %2.6f \n", elapsed, elapsed/NUMTESTS);
 
 
 	 //-- SuperScalar SSE2
 	 // SSSE2 code is not working
-    //clock_gettime(CLOCK_MONOTONIC, &before);
-    //for (i = 0; i < NUMTESTS; i++) {
-        //superScalarSSE2();
-    //}
-    //clock_gettime(CLOCK_MONOTONIC, &after);
+    clock_gettime(CLOCK_MONOTONIC, &before);
+    for (i = 0; i < NUMTESTS; i++) {
+        superScalarSSE2();
+    }
+    clock_gettime(CLOCK_MONOTONIC, &after);
 
-    //checksum = 0;
-    //for (i = 0; i < TESTDATALEN/2; i++) {
-        //checksum += result[i];
-    //}
-    //printf("checksum: %llu\n", checksum);
-    //elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    //printf("optimized lookup superScalarSSE2() took %f seconds\n", elapsed);
-	 //writeResults("superScalerSSE2.dat");
+    checksum = 0;
+    for (i = 0; i < TESTDATALEN/2; i++) {
+        checksum += result[i];
+    }
+    printf("\nchecksum: %llu\n", checksum);
+    elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
+    printf("optimized lookup superScalarSSE2() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
+	 writeResults("superScalerSSE2.dat");
 
 	 //-- SuperScalar SSSE3
     clock_gettime(CLOCK_MONOTONIC, &before);
@@ -376,9 +376,9 @@ int main() {
     for (i = 0; i < TESTDATALEN/2; i++) {
         checksum += result[i];
     }
-    printf("checksum: %llu\n", checksum);
+    printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup superScalarSSSE3() took %f seconds\n", elapsed);
+    printf("optimized lookup superScalarSSSE3() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("superScalerSSSE3.dat");
 
 	 // -----
@@ -394,9 +394,9 @@ int main() {
     for (i = 0; i < TESTDATALEN/2; i++) {
         checksum += result[i];
     }
-    printf("checksum: %llu\n", checksum);
+    printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup lookupBasic() took %f seconds\n", elapsed);
+    printf("optimized lookup lookupBasic() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("lookupBasic.dat");
 
 	 // -----
@@ -411,9 +411,9 @@ int main() {
     for (i = 0; i < TESTDATALEN/2; i++) {
         checksum += result[i];
     }
-    printf("checksum: %llu\n", checksum);
+    printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("256 entries table lookup256() took %f seconds\n", elapsed);
+    printf("256 entries table lookup256() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("lookup256.dat");
 
 	 // -----
@@ -428,9 +428,9 @@ int main() {
     for (i = 0; i < TESTDATALEN/2; i++) {
         checksum += result[i];
     }
-    printf("checksum: %llu\n", checksum);
+    printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("32768 entries table lookup32k() took %f seconds\n", elapsed);
+    printf("32768 entries table lookup32k() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("lookup32k.dat");
 
 	 // -----
@@ -445,9 +445,9 @@ int main() {
     for (i = 0; i < TESTDATALEN/2; i++) {
         checksum += result[i];
     }
-    printf("checksum: %llu\n", checksum);
+    printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("65536 entries table lookup64k() took %f seconds\n", elapsed);
+    printf("65536 entries table lookup64k() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("lookup64k.dat");
 	 // -----
 
