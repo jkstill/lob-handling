@@ -85,17 +85,52 @@ Elapsed: 0.776294
 
 ### PL/SQL
 
-Call the PL/SQL stored functions
+Create the PL/SQL stored functions
+
+```text
+@hex-to-blob-plsql.sql
+```
 
 #### PL/SQL anonymous block
 
+nearly 40 seconds for 100 iterations
+
+```text
+@hex-to-bin-test-anon.sql
+Elapsed time (cs): 3972
+Average time per iteration (cs): 39.72
+CPU Elapsed time (cs): 567
+CPU Average time per iteration (cs): 5.67
+```
+
 #### PL/SQL Procedure
+
+```text
+exec hex_to_bin_test
+Elapsed time (cs): 4049
+Average time per iteration (cs): 40.49
+CPU Elapsed time (cs): 567
+CPU Average time per iteration (cs): 5.67
+
+```
 
 #### PL/SQL Compiled Procedure
 
 Compile the functions and the calling procedure:
 
+No improvement.
 
+```text
+@plsql-compile-native
+```
+
+```text
+ exec hex_to_bin_test
+Elapsed time (cs): 3992
+Average time per iteration (cs): 39.92
+CPU Elapsed time (cs): 559
+CPU Average time per iteration (cs): 5.59
+```
 
 
 
