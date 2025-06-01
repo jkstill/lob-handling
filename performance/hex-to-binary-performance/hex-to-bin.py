@@ -12,5 +12,5 @@ def hex_to_jpg(hex_file_path, jpg_file_path):
       jpg_file.write(binary_data)
 
 # Example usage
-hex_to_jpg('data/testdata.hex', 'testdata.bin')
+hex_to_jpg('data/testdata.hex', 'data/python.dat')
 

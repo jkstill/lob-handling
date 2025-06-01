@@ -9,7 +9,16 @@
 #include "base16_decoding_table.h"
 
 //#define TESTDATALEN 10000000
+//
+// 2M and 100 tests for large test data
+// adjust create-testdata.sh to create 2M test data
 #define TESTDATALEN 2000000
+#define NUMTESTS 100
+
+// adjust create-testdata.sh to create 288 test data
+// 288 and 1M tests for small test data
+//#define TESTDATALEN 288
+//#define NUMTESTS 1000000
 
 /* the resulting binary string is half the size of the input hex string
  * because every two hex characters map to one byte */
@@ -320,7 +329,6 @@ void writeHex(char *filename)
 
 
 
-#define NUMTESTS 100
 
 int main() {
     struct timespec before, after;
@@ -328,7 +336,7 @@ int main() {
     int i;
     double elapsed;
 
-	 //printf("TESTDATALEN: %d\n", TESTDATALEN);
+	 printf("TESTDATALEN: %d\n", TESTDATALEN);
 	 writeHex("testdata.hex");
 
 	 // basic
@@ -345,7 +353,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("arithmetic solution calcHex() took %3.6f seconds avg: %2.6f \n", elapsed, elapsed/NUMTESTS);
+    printf("arithmetic solution calcHex() took %3.6f seconds avg: %2.9f \n", elapsed, elapsed/NUMTESTS);
 
 
 	 //-- SuperScalar SSE2
@@ -362,7 +370,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup superScalarSSE2() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
+    printf("optimized lookup superScalarSSE2() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("superScalerSSE2.dat");
 
 	 //-- SuperScalar SSSE3
@@ -378,7 +386,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup superScalarSSSE3() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
+    printf("optimized lookup superScalarSSSE3() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("superScalerSSSE3.dat");
 
 	 // -----
@@ -396,7 +404,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup lookupBasic() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
+    printf("optimized lookup lookupBasic() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("lookupBasic.dat");
 
 	 // -----
@@ -413,7 +421,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("256 entries table lookup256() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
+    printf("256 entries table lookup256() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("lookup256.dat");
 
 	 // -----
@@ -430,7 +438,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("32768 entries table lookup32k() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
+    printf("32768 entries table lookup32k() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("lookup32k.dat");
 
 	 // -----
@@ -447,7 +455,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("65536 entries table lookup64k() took %3.6f seconds avg: %2.6f\n", elapsed, elapsed/NUMTESTS);
+    printf("65536 entries table lookup64k() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
 	 writeResults("lookup64k.dat");
 	 // -----
 

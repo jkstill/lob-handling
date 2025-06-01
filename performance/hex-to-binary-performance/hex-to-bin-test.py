@@ -2,6 +2,7 @@
 
 import time
 
+iterations = 100
 
 # Read the hex file and convert it to a JPG file
 def get_hex_data(hex_file_path):
@@ -22,17 +23,19 @@ def main():
 
    # convert hex to binary
    # loop 100 times
-   for i in range(100):
-      print('.', end='')
+   for i in range(iterations):
+      #print('.', end='')
       binary_data = hex_to_jpg(hex_data)
 
    print()
 
    end = time.time()
-   print(end - start)
+   # format the time to microseconds
+   print(f'Elapsed: {end - start:.6f} seconds')
+   print(f'   Avg : {(end - start)/iterations:.6f} seconds')
 
    # Write binary data to a JPG file
-   with open('data/testdata-py.bin', 'wb') as jpg_file:
+   with open('data/python.dat', 'wb') as jpg_file:
       jpg_file.write(binary_data)
 
 

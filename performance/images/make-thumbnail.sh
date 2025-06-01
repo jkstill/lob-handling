@@ -5,7 +5,7 @@ input_file="$1"
 output_file="${input_file%.*}_thumb.${input_file##*.}"
 
 ffmpeg -i $input_file \
-  -vf "scale=150:-1" \
+  -vf "scale=20:-1" \
   -q:v 2 \
   $output_file
 

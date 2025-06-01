@@ -9,7 +9,7 @@ banner "remove old data"
 rm data/*
 
 banner "compiling hex-to-bin-tests-new.c"
-gcc -msse2 -mssse3 -O3 -O2 -o hex-to-bin-tests-new hex-to-bin-tests-new.c
+./build.sh
 
 banner "running hex-to-bin-tests-new"
 ./hex-to-bin-tests-new
