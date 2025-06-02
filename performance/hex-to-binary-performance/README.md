@@ -35,7 +35,9 @@ PL/SQL, Perl and Python results are shown as well.
 C: hex-to-bin-tests-new.c
 Python: hex-to-bin-test.py
 Perl: hex-to-bin-test.pl
-PL/SQL anonymous block: hex-to-bin-test.sql
+PL/SQL anonymous block test of PL/SQL calculation functions: to-blob-chunk4k-test.sql
+PL/SQL anonymous block test of PL/SQL hextoraw conversion function: hex64k-test.sql
+PL/SQL test of hextoraw conversion function with data in a table: hex64-func-test.sql
 
 ### C
 
@@ -91,47 +93,75 @@ Create the PL/SQL stored functions
 @hex-to-blob-plsql.sql
 ```
 
-#### PL/SQL anonymous block
+#### PL/SQL Procedures and Functions
 
-nearly 40 seconds for 100 iterations
+Test a PL/SQL function that use dbms_lob.substr to get the hex data in 4k chunks, and uses hextoraw to convert the hex to binary.
 
-```text
-@hex-to-bin-test-anon.sql
-Elapsed time (cs): 3972
-Average time per iteration (cs): 39.72
-CPU Elapsed time (cs): 567
-CPU Average time per iteration (cs): 5.67
-```
-
-#### PL/SQL Procedure
+This is similar to what is used in the SQL Developer Migration Workbench to convert hex data to binary.
 
 ```text
-exec hex_to_bin_test
-Elapsed time (cs): 4049
-Average time per iteration (cs): 40.49
-CPU Elapsed time (cs): 567
-CPU Average time per iteration (cs): 5.67
-
+ @to-blob-chunk4k-test.sql
+Convert to blob elapsed: 11.61
+Convert to blob average: .116
+Blob bytes : 1048576
 ```
+nearly 12 seconds for 100 iterations.
 
-#### PL/SQL Compiled Procedure
+This may not seem to slow, but it can be done faster than this.
 
-Compile the functions and the calling procedure:
-
-No improvement.
+Compile the function to native code:
 
 ```text
 @plsql-compile-native
 ```
 
 ```text
- exec hex_to_bin_test
-Elapsed time (cs): 3992
-Average time per iteration (cs): 39.92
-CPU Elapsed time (cs): 559
-CPU Average time per iteration (cs): 5.59
+ exec to_blob_chunk4k_test
+
+only a very small improvement.
+
+```text
+@plsql-compile-native
+
+Convert to blob elapsed: 11.47
+Convert to blob average: .115
+Blob bytes : 1048576
+
 ```
 
+Now use an optimized PL/SQL function that does not use `dbms_lob.substr()`
+
+```text
+@hex64k-test.sql
+
+Convert to blob elapsed: 3.31
+Convert to blob average: .033
+Blob bytes : 1048576
+```
+This is about 3x faster than the previous PL/SQL function.
+
+## Rank of speed
+
+1. C sse3 simd method
+  - 0.000169 seconds avg
+1. C 64k lookup method
+  - 0.000372 seconds avg
+1. C 32k lookup method
+  - 0.000388 seconds avg
+1. Python Bytes module
+  - 0.000783 seconds avg
+1. C basic lookup method
+  - 0.000890 seconds avg
+1. C 256 lookup method
+  - 0.000895 seconds avg
+1. C arithmetic method
+  - 0.0066662 seconds avg
+1. Perl pack() method
+  - 0.007763 seconds avg
+1. PL/SQL optimized function
+  - 0.033000 seconds avg
+1. PL/SQL chunked function
+  - 0.115000 seconds avg
 
 
 

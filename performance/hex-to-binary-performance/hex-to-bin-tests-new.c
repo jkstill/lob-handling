@@ -12,7 +12,7 @@
 //
 // 2M and 100 tests for large test data
 // adjust create-testdata.sh to create 2M test data
-#define TESTDATALEN 2000000
+#define TESTDATALEN 2097152
 #define NUMTESTS 100
 
 // adjust create-testdata.sh to create 288 test data
