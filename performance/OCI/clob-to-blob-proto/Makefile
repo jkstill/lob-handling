@@ -2,7 +2,7 @@
 
 CC=gcc
 #CFLAGS=-Wall -O3 -std=c99 -msse2 -g -fsanitize=address
-CFLAGS=-Wall -O3 -std=c99 -msse2 -g
+CFLAGS=-Wall -O3 -std=c99 -msse2 -mssse3 -g
 LDFLAGS=-l:libocilib.a -lclntsh -L/usr/local/lib -L/u01/app/oracle/product/19c/lib
 
 LSAN_FILE := lsan.supp

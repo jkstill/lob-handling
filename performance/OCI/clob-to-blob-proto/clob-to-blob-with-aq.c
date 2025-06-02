@@ -13,7 +13,8 @@
 #include <ctype.h>
 #include <getopt.h>
 
-#include <emmintrin.h> // SSE3
+#include <emmintrin.h> // SSE2
+#include <tmmintrin.h>  // for _mm_shuffle_epi8 (SSSE3)
 
 #define MAX_BATCH_SIZE 100
 #define MAX_COLUMNS 8
@@ -151,6 +152,77 @@ int hex_to_binary_sse3(OCI_Lob *hex_data, unsigned int *hex_length, OCI_Lob *bin
     }
 
     size_t i;
+    for (i = 0; i + 32 <= n; i += 32) {
+        // Load 32 hex characters into two registers
+        __m128i block1 = _mm_loadu_si128((const __m128i *)(hex_char_data + i));
+        __m128i block2 = _mm_loadu_si128((const __m128i *)(hex_char_data + i + 16));
+
+        // Create shuffle masks for extracting even and odd indices
+        // 0x80 indicates that byte is not used (masked out)
+        __m128i idxEven = _mm_setr_epi8(
+            0,  2,  4,  6,  8, 10, 12, 14,
+            (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80
+        );
+        __m128i idxOdd = _mm_setr_epi8(
+            1,  3,  5,  7,  9, 11, 13, 15,
+            (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80
+        );
+
+        // Extract even and odd bytes from block1 and block2
+        __m128i evens_block1 = _mm_shuffle_epi8(block1, idxEven); // even indices from first 16 chars
+        __m128i odds_block1  = _mm_shuffle_epi8(block1, idxOdd);  // odd indices from first 16 chars
+        __m128i evens_block2 = _mm_shuffle_epi8(block2, idxEven); // even indices from next 16 chars
+        __m128i odds_block2  = _mm_shuffle_epi8(block2, idxOdd);  // odd indices from next 16 chars
+
+        // Combine evens from block1 and block2 into one 128-bit register
+        // evens_block1 has 8 valid bytes at the start
+        // evens_block2 has 8 valid bytes at the start, we shift it left by 8 bytes and OR
+        __m128i evens = _mm_or_si128(evens_block1, _mm_slli_si128(evens_block2, 8));
+
+        // Combine odds similarly
+        __m128i odds = _mm_or_si128(odds_block1, _mm_slli_si128(odds_block2, 8));
+
+        // Now we have:
+        // evens = [b0, b2, b4, b6, b8, b10, b12, b14, b16, b18, b20, b22, b24, b26, b28, b30]
+        // odds  = [b1, b3, b5, b7, b9, b11, b13, b15, b17, b19, b21, b23, b25, b27, b29, b31]
+
+        // Convert ASCII chars to nibbles
+        __m128i zero = _mm_set1_epi8('0');
+
+        // Subtract '0'
+        evens = _mm_sub_epi8(evens, zero);
+        odds  = _mm_sub_epi8(odds, zero);
+
+        // Masks for uppercase and lowercase
+        __m128i upperA = _mm_set1_epi8('A'-1);
+        __m128i upperF = _mm_set1_epi8('F'+1);
+        __m128i lowerA = _mm_set1_epi8('a'-1);
+        __m128i lowerF = _mm_set1_epi8('f'+1);
+
+        __m128i chars_evens = _mm_add_epi8(evens, zero); // convert back to ASCII space
+        __m128i chars_odds  = _mm_add_epi8(odds, zero);
+
+        __m128i ucase_mask_e = _mm_and_si128(_mm_cmpgt_epi8(chars_evens, upperA), _mm_cmplt_epi8(chars_evens, upperF));
+        __m128i lcase_mask_e = _mm_and_si128(_mm_cmpgt_epi8(chars_evens, lowerA), _mm_cmplt_epi8(chars_evens, lowerF));
+        __m128i ucase_mask_o = _mm_and_si128(_mm_cmpgt_epi8(chars_odds,  upperA), _mm_cmplt_epi8(chars_odds,  upperF));
+        __m128i lcase_mask_o = _mm_and_si128(_mm_cmpgt_epi8(chars_odds,  lowerA), _mm_cmplt_epi8(chars_odds,  lowerF));
+
+        // For uppercase: subtract additional 7
+        evens = _mm_sub_epi8(evens, _mm_and_si128(ucase_mask_e, _mm_set1_epi8(7)));
+        odds  = _mm_sub_epi8(odds,  _mm_and_si128(ucase_mask_o, _mm_set1_epi8(7)));
+
+        // For lowercase: subtract additional 39
+        evens = _mm_sub_epi8(evens, _mm_and_si128(lcase_mask_e, _mm_set1_epi8(39)));
+        odds  = _mm_sub_epi8(odds,  _mm_and_si128(lcase_mask_o, _mm_set1_epi8(39)));
+
+        // Now evens are high nibbles, odds are low nibbles
+        __m128i high_shifted = _mm_slli_epi16(evens, 4);
+        __m128i bytes = _mm_or_si128(high_shifted, odds);
+
+        // Store result
+        _mm_storeu_si128((__m128i *)(binary_char_data + i/2), bytes);
+    }
+
     for (i = 0; i < n; i += 2) {
         unsigned char high = hex_char_data[i];
         unsigned char low = hex_char_data[i + 1];
