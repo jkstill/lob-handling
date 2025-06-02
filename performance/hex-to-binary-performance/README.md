@@ -142,6 +142,8 @@ This is about 3x faster than the previous PL/SQL function.
 
 ## Rank of speed
 
+Convert 2M of hex data to 1M binary blob data
+
 1. C sse3 simd method
   - 0.000169 seconds avg
 1. C 64k lookup method
