@@ -32,6 +32,8 @@ unsigned char result[TESTDATALEN/2];
 // stick with SSSE3
 void superScalarSSE2(void)
 {
+    strcpy((char *)result, "\0");
+
     // Constants stored in arrays
     static const unsigned char lookup_high_values[16] = {
         0x00, 0x10, 0x20, 0x30,
