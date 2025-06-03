@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <emmintrin.h> // SSE2 header
+#include <immintrin.h>  // AVX2, SSE
 #include <tmmintrin.h>  // for _mm_shuffle_epi8 (SSSE3)							  
 
 #include "testdata.h"
@@ -206,6 +207,135 @@ void superScalarSSSE3(void)
     }
 }
 
+// --- SIMD2 Function ---
+void simd2_hex_to_bin(void) {
+	 
+    strcpy((char *)result, "\0");
+    size_t i;
+    for (i = 0; i + 32 <= TESTDATALEN; i += 32) {
+        __m128i block1 = _mm_loadu_si128((const __m128i *)(testdata + i));
+        __m128i block2 = _mm_loadu_si128((const __m128i *)(testdata + i + 16));
+
+        __m128i idxEven = _mm_setr_epi8(0, 2, 4, 6, 8,10,12,14, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80);
+        __m128i idxOdd  = _mm_setr_epi8(1, 3, 5, 7, 9,11,13,15, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80);
+
+        __m128i evens = _mm_or_si128(_mm_shuffle_epi8(block1, idxEven), _mm_slli_si128(_mm_shuffle_epi8(block2, idxEven), 8));
+        __m128i odds  = _mm_or_si128(_mm_shuffle_epi8(block1, idxOdd),  _mm_slli_si128(_mm_shuffle_epi8(block2, idxOdd),  8));
+
+        __m128i zero = _mm_set1_epi8('0');
+        evens = _mm_sub_epi8(evens, zero);
+        odds  = _mm_sub_epi8(odds,  zero);
+
+        __m128i chars_evens = _mm_add_epi8(evens, zero);
+        __m128i chars_odds  = _mm_add_epi8(odds, zero);
+
+        __m128i upperA = _mm_set1_epi8('A'-1), upperF = _mm_set1_epi8('F'+1);
+        __m128i lowerA = _mm_set1_epi8('a'-1), lowerF = _mm_set1_epi8('f'+1);
+
+        __m128i ucase_mask_e = _mm_and_si128(_mm_cmpgt_epi8(chars_evens, upperA), _mm_cmplt_epi8(chars_evens, upperF));
+        __m128i lcase_mask_e = _mm_and_si128(_mm_cmpgt_epi8(chars_evens, lowerA), _mm_cmplt_epi8(chars_evens, lowerF));
+        __m128i ucase_mask_o = _mm_and_si128(_mm_cmpgt_epi8(chars_odds,  upperA), _mm_cmplt_epi8(chars_odds,  upperF));
+        __m128i lcase_mask_o = _mm_and_si128(_mm_cmpgt_epi8(chars_odds,  lowerA), _mm_cmplt_epi8(chars_odds,  lowerF));
+
+        evens = _mm_sub_epi8(evens, _mm_and_si128(ucase_mask_e, _mm_set1_epi8(7)));
+        evens = _mm_sub_epi8(evens, _mm_and_si128(lcase_mask_e, _mm_set1_epi8(39)));
+        odds  = _mm_sub_epi8(odds,  _mm_and_si128(ucase_mask_o, _mm_set1_epi8(7)));
+        odds  = _mm_sub_epi8(odds,  _mm_and_si128(lcase_mask_o, _mm_set1_epi8(39)));
+
+        __m128i high_shifted = _mm_slli_epi16(evens, 4);
+        __m128i bytes = _mm_or_si128(high_shifted, odds);
+
+        _mm_storeu_si128((__m128i *)(result + i / 2), bytes);
+    }
+
+    // Process any remaining characters (less than 32)
+    for (; i < TESTDATALEN; i += 2) {
+        unsigned char high = testdata[i];
+        unsigned char low = testdata[i + 1];
+
+        high = (high >= '0' && high <= '9') ? high - '0' :
+               (high >= 'A' && high <= 'F') ? high - 'A' + 10 :
+               (high >= 'a' && high <= 'f') ? high - 'a' + 10 : 0;
+
+        low = (low >= '0' && low <= '9') ? low - '0' :
+              (low >= 'A' && low <= 'F') ? low - 'A' + 10 :
+              (low >= 'a' && low <= 'f') ? low - 'a' + 10 : 0;
+
+        result[i / 2] = (high << 4) | low;
+    }
+}
+
+void simd_hex_to_bin_avx2(void) {
+    strcpy((char *)result, "\0");
+    size_t i;
+    for (i = 0; i + 32 <= TESTDATALEN; i += 32) {
+        __m256i chars = _mm256_loadu_si256((const __m256i *)(testdata + i));
+        __m256i idx_even = _mm256_setr_epi8(0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30, -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1);
+        __m256i idx_odd  = _mm256_setr_epi8(1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31, -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1);
+
+        __m256i evens = _mm256_shuffle_epi8(chars, idx_even);
+        __m256i odds  = _mm256_shuffle_epi8(chars, idx_odd);
+
+        __m256i zero = _mm256_set1_epi8('0');
+        __m256i evens_sub = _mm256_sub_epi8(evens, zero);
+        __m256i odds_sub  = _mm256_sub_epi8(odds,  zero);
+
+        __m256i evens_ascii = _mm256_add_epi8(evens_sub, zero);
+        __m256i odds_ascii  = _mm256_add_epi8(odds_sub,  zero);
+
+        __m256i upperA = _mm256_set1_epi8('A' - 1);
+        __m256i upperF = _mm256_set1_epi8('F' + 1);
+        __m256i lowerA = _mm256_set1_epi8('a' - 1);
+        __m256i lowerF = _mm256_set1_epi8('f' + 1);
+
+        //__m256i ucase_mask_e = _mm256_and_si256(_mm256_cmpgt_epi8(evens_ascii, upperA), _mm256_cmplt_epi8(evens_ascii, upperF));
+        //__m256i lcase_mask_e = _mm256_and_si256(_mm256_cmpgt_epi8(evens_ascii, lowerA), _mm256_cmplt_epi8(evens_ascii, lowerF));
+        //__m256i ucase_mask_o = _mm256_and_si256(_mm256_cmpgt_epi8(odds_ascii, upperA), _mm256_cmplt_epi8(odds_ascii, upperF));
+        //__m256i lcase_mask_o = _mm256_and_si256(_mm256_cmpgt_epi8(odds_ascii, lowerA), _mm256_cmplt_epi8(odds_ascii, lowerF));
+
+        __m256i ucase_mask_e = _mm256_and_si256(
+            _mm256_cmpgt_epi8(evens_ascii, upperA),
+            _mm256_cmpgt_epi8(upperF, evens_ascii));
+
+        __m256i lcase_mask_e = _mm256_and_si256(
+            _mm256_cmpgt_epi8(evens_ascii, lowerA),
+            _mm256_cmpgt_epi8(lowerF, evens_ascii));
+
+        __m256i ucase_mask_o = _mm256_and_si256(
+            _mm256_cmpgt_epi8(odds_ascii, upperA),
+            _mm256_cmpgt_epi8(upperF, odds_ascii));
+
+        __m256i lcase_mask_o = _mm256_and_si256(
+            _mm256_cmpgt_epi8(odds_ascii, lowerA),
+            _mm256_cmpgt_epi8(lowerF, odds_ascii));
+
+
+        evens_sub = _mm256_sub_epi8(evens_sub, _mm256_or_si256(_mm256_and_si256(ucase_mask_e, _mm256_set1_epi8(7)), _mm256_and_si256(lcase_mask_e, _mm256_set1_epi8(39))));
+        odds_sub  = _mm256_sub_epi8(odds_sub,  _mm256_or_si256(_mm256_and_si256(ucase_mask_o, _mm256_set1_epi8(7)), _mm256_and_si256(lcase_mask_o, _mm256_set1_epi8(39))));
+
+        __m256i high_shifted = _mm256_slli_epi16(evens_sub, 4);
+        __m256i combined = _mm256_or_si256(high_shifted, odds_sub);
+
+        __m128i avx2result = _mm256_castsi256_si128(_mm256_permute4x64_epi64(combined, 0xD8));
+        _mm_storeu_si128((__m128i *)(result + i / 2), avx2result);
+    }
+
+    // Process any remaining characters (less than 32)
+    for (; i < TESTDATALEN; i += 2) {
+        unsigned char high = testdata[i];
+        unsigned char low = testdata[i + 1];
+
+        high = (high >= '0' && high <= '9') ? high - '0' :
+               (high >= 'A' && high <= 'F') ? high - 'A' + 10 :
+               (high >= 'a' && high <= 'f') ? high - 'a' + 10 : 0;
+
+        low = (low >= '0' && low <= '9') ? low - '0' :
+              (low >= 'A' && low <= 'F') ? low - 'A' + 10 :
+              (low >= 'a' && low <= 'f') ? low - 'a' + 10 : 0;
+
+        result[i / 2] = (high << 4) | low;
+    }
+}
 
 void calcHex()
 {
@@ -354,6 +484,39 @@ int main() {
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
     printf("arithmetic solution calcHex() took %3.6f seconds avg: %2.9f \n", elapsed, elapsed/NUMTESTS);
+
+	 // new SIMD2 
+    clock_gettime(CLOCK_MONOTONIC, &before);
+    for (i = 0; i < NUMTESTS; i++) {
+        simd2_hex_to_bin();
+    }
+    clock_gettime(CLOCK_MONOTONIC, &after);
+
+    checksum = 0;
+    for (i = 0; i < TESTDATALEN/2; i++) {
+        checksum += result[i];
+    }
+    printf("\nchecksum: %llu\n", checksum);
+    elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
+    printf("optimized lookup simd2_hex_to_bin() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
+	 writeResults("simd2_hex_to_bin.dat");
+
+	 // new AVX2 
+	 // this code is not working correctly
+    clock_gettime(CLOCK_MONOTONIC, &before);
+    for (i = 0; i < NUMTESTS; i++) {
+        simd_hex_to_bin_avx2();
+    }
+    clock_gettime(CLOCK_MONOTONIC, &after);
+
+    checksum = 0;
+    for (i = 0; i < TESTDATALEN/2; i++) {
+        checksum += result[i];
+    }
+    printf("\nchecksum: %llu\n", checksum);
+    elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
+    printf("optimized lookup simd_hex_to_bin_avx2() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
+	 writeResults("simd_hex_to_bin_avx2.dat");
 
 
 	 //-- SuperScalar SSE2
