@@ -85,6 +85,17 @@ Elapsed: 0.776294
     Avg: 0.007763
 ```
 
+### Perl Data::HexConverter 
+
+The Perl Data::HexConverter module is about 36x faster than the pack() method.
+
+```text
+$  ./hex-converter.pl
+
+Elapsed: 0.021900
+    Avg: 0.000219
+```
+
 ### PL/SQL
 
 Create the PL/SQL stored functions
@@ -146,6 +157,8 @@ Convert 2M of hex data to 1M binary blob data
 
 1. C sse3 simd method
   - 0.000169 seconds avg
+1. Perl Data::HexConverter module
+  - 0.000219 seconds avg
 1. C 64k lookup method
   - 0.000372 seconds avg
 1. C 32k lookup method
@@ -164,6 +177,5 @@ Convert 2M of hex data to 1M binary blob data
   - 0.033000 seconds avg
 1. PL/SQL chunked function
   - 0.115000 seconds avg
-
 
 
