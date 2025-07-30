@@ -9,6 +9,7 @@ use IO::File;
 my $iterations = 100;
 
 my $hex_file = 'data/testdata.hex';
+$hex_file = 'data/testdata-100M.hex';
 my $bin_file = 'data/perl.dat';
 
 my $hex_fh = IO::File->new($hex_file, 'r') or die "Can't open $hex_file: $!";

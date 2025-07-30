@@ -9,11 +9,13 @@ use IO::File;
 
 my $iterations = 100;
 
-my $hex_file = 'data/testdata.hex';
+my $hex_file = 'data/testdata-100M.hex';
 my $bin_file = 'data/perl-hex-converter.dat';
+my $result_file = 'data/perl-hex-converter-result.hex';
 
 my $hex_fh = IO::File->new($hex_file, 'r') or die "Can't open $hex_file: $!";
 my $bin_fh = IO::File->new($bin_file, 'w') or die "Can't open $bin_file: $!";
+my $hexnew_fh = IO::File->new($result_file, 'w') or die "Can't open $result_file $!";
 binmode $bin_fh;
 
 my $hex_data;
@@ -30,6 +32,9 @@ my $start_time = Time::HiRes::gettimeofday();
 $| = 1;
 
 my $bin_data;
+
+print "hex_data length: ", length($hex_data), "\n";
+
 for (my $i = 0; $i < $iterations; $i++) {
 	#print '.';
 	$bin_data = hex_to_binary(\$hex_data);

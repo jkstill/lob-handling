@@ -3,7 +3,7 @@
 https://stackoverflow.com/questions/8551383/how-to-convert-a-hexadecimal-string-to-a-binary-string-in-c#
 
 ```
-./create-testdata.sh
+./create-testdata-header.sh
 ./create-header.py
 
 $  gcc -o hex-to-bin-tests hex-to-bin-tests.c
