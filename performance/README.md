@@ -99,11 +99,21 @@ Currently the Perl script reads the CLOB into a variable and converts it to to b
 Use C to convert the CLOB to BLOB.
 see blob.c
 
+See [hex-to-binary-performance](./hex-to-binary-performanced) for performance tests of hex to binary conversions.
+
+There are several methods to convert hex to binary in C, several of the tested here.
+
+All of them are faster than the Perl pack() method, the Pyhon bytes.fromhex() method, and the PL/SQL hextoraw() method.
+
+PL/SQL is just not the appropriate tool for this type of data conversion.
+
 ### Method to use
 
 The most likely method to use is the PL/SQL wrapper function that calls `DBMS_LOB.CONVERTTOBLOB`.
 
 It can be used from Perl.
+
+Edit:  far too slow.
 
 ## Testing
 
