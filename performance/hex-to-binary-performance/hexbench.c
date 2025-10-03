@@ -19,6 +19,110 @@ double current_time() {
     return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
+// Pure SSE2 (no SSSE3). Extract evens/odds with unpack/pack, then decode.
+// This is not nearly as fast as the SSSE3 version
+// --- SSE2 Function ---
+void simd2_hex_to_bin_sse2(const char *hex_char_data, unsigned char *binary_char_data, size_t n) {
+
+    const __m128i zero    = _mm_setzero_si128();
+    const __m128i ascii0  = _mm_set1_epi8('0');
+    const __m128i adj_uc  = _mm_set1_epi8(7);     // 'A'..'F'
+    const __m128i adj_lc  = _mm_set1_epi8(39);    // 'a'..'f'
+
+    const __m128i A_m1 = _mm_set1_epi8('A' - 1);
+    const __m128i F_p1 = _mm_set1_epi8('F' + 1);
+    const __m128i a_m1 = _mm_set1_epi8('a' - 1);
+    const __m128i f_p1 = _mm_set1_epi8('f' + 1);
+
+    for (size_t i = 0; i + 32 <= n; i += 32) {
+        const __m128i b1 = _mm_loadu_si128((const __m128i *)(hex_char_data + i));
+        const __m128i b2 = _mm_loadu_si128((const __m128i *)(hex_char_data + i + 16));
+
+        // Unpack to words (byte -> 16-bit lane with high 8=0)
+        __m128i b1_lo = _mm_unpacklo_epi8(b1, zero);  // words: b0,b1,b2,...,b7
+        __m128i b1_hi = _mm_unpackhi_epi8(b1, zero);  // words: b8..b15
+        __m128i b2_lo = _mm_unpacklo_epi8(b2, zero);
+        __m128i b2_hi = _mm_unpackhi_epi8(b2, zero);
+
+        // Select even-indexed bytes (0,2,4,6,8,10,12,14) from b1
+        __m128i e1 = _mm_setzero_si128();
+        e1 = _mm_insert_epi16(e1, _mm_extract_epi16(b1_lo, 0), 0);
+        e1 = _mm_insert_epi16(e1, _mm_extract_epi16(b1_lo, 2), 1);
+        e1 = _mm_insert_epi16(e1, _mm_extract_epi16(b1_lo, 4), 2);
+        e1 = _mm_insert_epi16(e1, _mm_extract_epi16(b1_lo, 6), 3);
+        e1 = _mm_insert_epi16(e1, _mm_extract_epi16(b1_hi, 0), 4);
+        e1 = _mm_insert_epi16(e1, _mm_extract_epi16(b1_hi, 2), 5);
+        e1 = _mm_insert_epi16(e1, _mm_extract_epi16(b1_hi, 4), 6);
+        e1 = _mm_insert_epi16(e1, _mm_extract_epi16(b1_hi, 6), 7);
+
+        // Select even-indexed bytes from b2
+        __m128i e2 = _mm_setzero_si128();
+        e2 = _mm_insert_epi16(e2, _mm_extract_epi16(b2_lo, 0), 0);
+        e2 = _mm_insert_epi16(e2, _mm_extract_epi16(b2_lo, 2), 1);
+        e2 = _mm_insert_epi16(e2, _mm_extract_epi16(b2_lo, 4), 2);
+        e2 = _mm_insert_epi16(e2, _mm_extract_epi16(b2_lo, 6), 3);
+        e2 = _mm_insert_epi16(e2, _mm_extract_epi16(b2_hi, 0), 4);
+        e2 = _mm_insert_epi16(e2, _mm_extract_epi16(b2_hi, 2), 5);
+        e2 = _mm_insert_epi16(e2, _mm_extract_epi16(b2_hi, 4), 6);
+        e2 = _mm_insert_epi16(e2, _mm_extract_epi16(b2_hi, 6), 7);
+
+        // Merge to 16 bytes of evens
+        __m128i evens = _mm_packus_epi16(e1, e2);
+
+        // Select odd-indexed bytes (1,3,5,7,9,11,13,15) from b1
+        __m128i o1 = _mm_setzero_si128();
+        o1 = _mm_insert_epi16(o1, _mm_extract_epi16(b1_lo, 1), 0);
+        o1 = _mm_insert_epi16(o1, _mm_extract_epi16(b1_lo, 3), 1);
+        o1 = _mm_insert_epi16(o1, _mm_extract_epi16(b1_lo, 5), 2);
+        o1 = _mm_insert_epi16(o1, _mm_extract_epi16(b1_lo, 7), 3);
+        o1 = _mm_insert_epi16(o1, _mm_extract_epi16(b1_hi, 1), 4);
+        o1 = _mm_insert_epi16(o1, _mm_extract_epi16(b1_hi, 3), 5);
+        o1 = _mm_insert_epi16(o1, _mm_extract_epi16(b1_hi, 5), 6);
+        o1 = _mm_insert_epi16(o1, _mm_extract_epi16(b1_hi, 7), 7);
+
+        // Select odd-indexed bytes from b2
+        __m128i o2 = _mm_setzero_si128();
+        o2 = _mm_insert_epi16(o2, _mm_extract_epi16(b2_lo, 1), 0);
+        o2 = _mm_insert_epi16(o2, _mm_extract_epi16(b2_lo, 3), 1);
+        o2 = _mm_insert_epi16(o2, _mm_extract_epi16(b2_lo, 5), 2);
+        o2 = _mm_insert_epi16(o2, _mm_extract_epi16(b2_lo, 7), 3);
+        o2 = _mm_insert_epi16(o2, _mm_extract_epi16(b2_hi, 1), 4);
+        o2 = _mm_insert_epi16(o2, _mm_extract_epi16(b2_hi, 3), 5);
+        o2 = _mm_insert_epi16(o2, _mm_extract_epi16(b2_hi, 5), 6);
+        o2 = _mm_insert_epi16(o2, _mm_extract_epi16(b2_hi, 7), 7);
+
+        // Merge to 16 bytes of odds
+        __m128i odds = _mm_packus_epi16(o1, o2);
+
+        // Keep ASCII copies for masks
+        __m128i chars_e = evens;
+        __m128i chars_o = odds;
+
+        // ASCII -> [0..] via -'0'
+        evens = _mm_sub_epi8(evens, ascii0);
+        odds  = _mm_sub_epi8(odds,  ascii0);
+
+        // Case masks
+        __m128i u_e = _mm_and_si128(_mm_cmpgt_epi8(chars_e, A_m1), _mm_cmplt_epi8(chars_e, F_p1));
+        __m128i u_o = _mm_and_si128(_mm_cmpgt_epi8(chars_o, A_m1), _mm_cmplt_epi8(chars_o, F_p1));
+        __m128i l_e = _mm_and_si128(_mm_cmpgt_epi8(chars_e, a_m1), _mm_cmplt_epi8(chars_e, f_p1));
+        __m128i l_o = _mm_and_si128(_mm_cmpgt_epi8(chars_o, a_m1), _mm_cmplt_epi8(chars_o, f_p1));
+
+        // subtract proper adjustments
+        evens = _mm_sub_epi8(evens, _mm_and_si128(u_e, adj_uc));
+        odds  = _mm_sub_epi8(odds,  _mm_and_si128(u_o, adj_uc));
+        evens = _mm_sub_epi8(evens, _mm_and_si128(l_e, adj_lc));
+        odds  = _mm_sub_epi8(odds,  _mm_and_si128(l_o, adj_lc));
+
+        // Pack nibbles: (high<<4) | low
+        __m128i high = _mm_slli_epi16(evens, 4);
+        __m128i out  = _mm_or_si128(high, odds);
+
+        _mm_storeu_si128((__m128i *)(binary_char_data + i/2), out);
+    }
+}
+
+
 // --- SIMD2 Function ---
 void simd2_hex_to_bin(const char *hex_char_data, unsigned char *binary_char_data, size_t n) {
     size_t i;
@@ -130,6 +234,12 @@ int main() {
         simd2_hex_to_bin(hex_data, bin_data, DATA_SIZE);
     end = current_time();
     printf("SIMD2 Time: %.6f seconds\n", end - start);
+
+    start = current_time();
+    for (int i = 0; i < 100; ++i)
+        simd2_hex_to_bin_sse2(hex_data, bin_data, DATA_SIZE);
+    end = current_time();
+    printf("SIMD2 new SSE2 Time: %.6f seconds\n", end - start);
 
     free(hex_data);
     free(bin_data);

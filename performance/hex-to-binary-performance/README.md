@@ -8,6 +8,7 @@ https://stackoverflow.com/questions/8551383/how-to-convert-a-hexadecimal-string-
 
 $  gcc -o hex-to-bin-tests hex-to-bin-tests.c
 
+
 ./hex-to-bin-tests
 
 ```
@@ -22,13 +23,15 @@ Compile:
 ```text
 $  gcc -mssse3 -O3 -o hex-to-bin-tests-new hex-to-bin-tests-new.c
 
-$  gcc -msse2 -mssse3 -O3 -O2 -o hex-to-bin-tests-new hex-to-bin-tests-new.c
+$  gcc -g -mavx2 -msse2 -mssse3 -O3 -O2 -o hex-to-bin-tests-new hex-to-bin-tests-new.c
 ```
 
 ## Tests:
 
-The sse2 tests are invalid as an as yet unresolved bug creates the wrong output.
-I keep the test here to motivate me to fix the bug, as sse2 is so fast.
+`hexto-bin-tests-new` tests various C methods of converting hex to binary.
+
+The clear winner is the AVX2 SIMD method, but it requires a CPU that supports AVX2.
+(most modern CPUs do)
 
 PL/SQL, Perl and Python results are shown as well.
 

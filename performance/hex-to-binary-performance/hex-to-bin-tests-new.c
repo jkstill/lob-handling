@@ -14,7 +14,7 @@
 // 2M and 100 tests for large test data
 // adjust create-testdata-header.sh to create 2M test data
 #define TESTDATALEN 2097152
-#define NUMTESTS 100
+#define NUMTESTS 1000
 
 // adjust create-testdata-header.sh to create 288 test data
 // 288 and 1M tests for small test data
@@ -25,12 +25,194 @@
  * because every two hex characters map to one byte */
 unsigned char result[TESTDATALEN/2];
 
+static inline unsigned char toNib(unsigned char c) {
+    unsigned char lower = (unsigned char)(c | 0x20);                    // make letters lowercase
+    unsigned char isLet = (unsigned)((unsigned)lower - 'a') <= ('f' - 'a'); // 'a'..'f'?
+    return (unsigned char)((c & 0x0Fu) + (isLet ? 9u : 0u));            // digit: 0..9, letter: +9 => 10..15
+}
+
+
+void superScalarAVX2_opt(void)
+{
+    memset(result, 0, sizeof(result));
+
+    const __m256i lower_mask = _mm256_set1_epi8(0x20);
+    const __m256i ch_a_m1    = _mm256_set1_epi8('a' - 1);
+    const __m256i ch_f_p1    = _mm256_set1_epi8('f' + 1);
+    const __m256i add9       = _mm256_set1_epi8(9);
+    const __m256i low_nib    = _mm256_set1_epi8(0x0F);
+
+    const __m256i idxEven = _mm256_setr_epi8(
+         0,  2,  4,  6,  8, 10, 12, 14, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,
+         0,  2,  4,  6,  8, 10, 12, 14, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80
+    );
+    const __m256i idxOdd  = _mm256_setr_epi8(
+         1,  3,  5,  7,  9, 11, 13, 15, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,
+         1,  3,  5,  7,  9, 11, 13, 15, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80
+    );
+
+    size_t i = 0;
+    for (; i + 64 <= TESTDATALEN; i += 64) {
+        __m256i v0 = _mm256_loadu_si256((const __m256i*)(testdata + i));
+        __m256i v1 = _mm256_loadu_si256((const __m256i*)(testdata + i + 32));
+
+        // Shuffle evens/odds per 128-bit lane (each has bytes in positions 0..7 of each lane)
+        __m256i e0 = _mm256_shuffle_epi8(v0, idxEven);
+        __m256i o0 = _mm256_shuffle_epi8(v0, idxOdd);
+        __m256i e1 = _mm256_shuffle_epi8(v1, idxEven);
+        __m256i o1 = _mm256_shuffle_epi8(v1, idxOdd);
+
+        // --- Correctly assemble within each 256b load ---
+        // From e0: low lane (0..7) then high lane (0..7) shifted into 8..15
+        __m128i e0_lo = _mm256_castsi256_si128(e0);
+        __m128i e0_hi = _mm256_extracti128_si256(e0, 1);
+        __m128i e0_128 = _mm_or_si128(e0_lo, _mm_slli_si128(e0_hi, 8));
+
+        __m128i o0_lo = _mm256_castsi256_si128(o0);
+        __m128i o0_hi = _mm256_extracti128_si256(o0, 1);
+        __m128i o0_128 = _mm_or_si128(o0_lo, _mm_slli_si128(o0_hi, 8));
+
+        // From e1/o1: same pattern
+        __m128i e1_lo = _mm256_castsi256_si128(e1);
+        __m128i e1_hi = _mm256_extracti128_si256(e1, 1);
+        __m128i e1_128 = _mm_or_si128(e1_lo, _mm_slli_si128(e1_hi, 8));
+
+        __m128i o1_lo = _mm256_castsi256_si128(o1);
+        __m128i o1_hi = _mm256_extracti128_si256(o1, 1);
+        __m128i o1_128 = _mm_or_si128(o1_lo, _mm_slli_si128(o1_hi, 8));
+
+        // Reassemble two 128b halves into one 256b: [v0-combined | v1-combined]
+        __m256i evens = _mm256_inserti128_si256(_mm256_castsi128_si256(e0_128), e1_128, 1);
+        __m256i odds  = _mm256_inserti128_si256(_mm256_castsi128_si256(o0_128), o1_128, 1);
+
+        // --- branchless ASCII→nibble ---
+        __m256i e_low = _mm256_or_si256(evens, lower_mask);
+        __m256i o_low = _mm256_or_si256(odds,  lower_mask);
+
+        __m256i e_is_letter = _mm256_and_si256(
+            _mm256_cmpgt_epi8(e_low, ch_a_m1), _mm256_cmpgt_epi8(ch_f_p1, e_low));
+        __m256i o_is_letter = _mm256_and_si256(
+            _mm256_cmpgt_epi8(o_low, ch_a_m1), _mm256_cmpgt_epi8(ch_f_p1, o_low));
+
+        evens = _mm256_add_epi8(_mm256_and_si256(evens, low_nib),
+                                _mm256_and_si256(e_is_letter, add9));
+        odds  = _mm256_add_epi8(_mm256_and_si256(odds,  low_nib),
+                                _mm256_and_si256(o_is_letter, add9));
+
+        __m256i high = _mm256_slli_epi16(evens, 4);
+        __m256i out  = _mm256_or_si256(high, odds);
+
+        _mm256_storeu_si256((__m256i*)(result + i/2), out);
+    }
+
+    // Scalar tail (remaining < 64 chars)
+    for (; i + 1 < TESTDATALEN; i += 2) {
+        result[i/2] = (unsigned char)((toNib(testdata[i]) << 4) | toNib(testdata[i+1]));
+    }
+}
+
+// try AVX2 again
+
+void superScalarAVX2(void)
+{
+    const __m256i ascii0 = _mm256_set1_epi8('0');
+    const __m256i adj_uc = _mm256_set1_epi8(7);   // 'A'..'F'
+    const __m256i adj_lc = _mm256_set1_epi8(39);  // 'a'..'f'
+
+    const __m256i A_m1 = _mm256_set1_epi8('A' - 1);
+    const __m256i F_p1 = _mm256_set1_epi8('F' + 1);
+    const __m256i a_m1 = _mm256_set1_epi8('a' - 1);
+    const __m256i f_p1 = _mm256_set1_epi8('f' + 1);
+
+    const __m256i idxEven = _mm256_setr_epi8(
+         0,  2,  4,  6,  8, 10, 12, 14, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,
+         0,  2,  4,  6,  8, 10, 12, 14, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80
+    );
+    const __m256i idxOdd  = _mm256_setr_epi8(
+         1,  3,  5,  7,  9, 11, 13, 15, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,
+         1,  3,  5,  7,  9, 11, 13, 15, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80
+    );
+
+    size_t i = 0;
+    for (; i + 64 <= TESTDATALEN; i += 64) {
+        __m256i v0 = _mm256_loadu_si256((const __m256i *)(testdata + i));
+        __m256i v1 = _mm256_loadu_si256((const __m256i *)(testdata + i + 32));
+
+        // Shuffle evens/odds per lane
+        __m256i e0 = _mm256_shuffle_epi8(v0, idxEven);
+        __m256i o0 = _mm256_shuffle_epi8(v0, idxOdd);
+        __m256i e1 = _mm256_shuffle_epi8(v1, idxEven);
+        __m256i o1 = _mm256_shuffle_epi8(v1, idxOdd);
+
+        // --- FIX: assemble within each load (v0, v1) ---
+        __m128i e0_lo = _mm256_castsi256_si128(e0);
+        __m128i e0_hi = _mm256_extracti128_si256(e0, 1);
+        __m128i e0_128 = _mm_or_si128(e0_lo, _mm_slli_si128(e0_hi, 8));
+
+        __m128i o0_lo = _mm256_castsi256_si128(o0);
+        __m128i o0_hi = _mm256_extracti128_si256(o0, 1);
+        __m128i o0_128 = _mm_or_si128(o0_lo, _mm_slli_si128(o0_hi, 8));
+
+        __m128i e1_lo = _mm256_castsi256_si128(e1);
+        __m128i e1_hi = _mm256_extracti128_si256(e1, 1);
+        __m128i e1_128 = _mm_or_si128(e1_lo, _mm_slli_si128(e1_hi, 8));
+
+        __m128i o1_lo = _mm256_castsi256_si128(o1);
+        __m128i o1_hi = _mm256_extracti128_si256(o1, 1);
+        __m128i o1_128 = _mm_or_si128(o1_lo, _mm_slli_si128(o1_hi, 8));
+
+        __m256i evens = _mm256_inserti128_si256(_mm256_castsi128_si256(e0_128), e1_128, 1);
+        __m256i odds  = _mm256_inserti128_si256(_mm256_castsi128_si256(o0_128), o1_128, 1);
+        // --- END FIX ---
+
+        // Keep ASCII copies for case detection
+        __m256i chars_e = evens;
+        __m256i chars_o = odds;
+
+        // ASCII → [0..]
+        evens = _mm256_sub_epi8(evens, ascii0);
+        odds  = _mm256_sub_epi8(odds,  ascii0);
+
+        // Masks
+        __m256i u_e = _mm256_and_si256(_mm256_cmpgt_epi8(chars_e, A_m1), _mm256_cmpgt_epi8(F_p1, chars_e));
+        __m256i u_o = _mm256_and_si256(_mm256_cmpgt_epi8(chars_o, A_m1), _mm256_cmpgt_epi8(F_p1, chars_o));
+        __m256i l_e = _mm256_and_si256(_mm256_cmpgt_epi8(chars_e, a_m1), _mm256_cmpgt_epi8(f_p1, chars_e));
+        __m256i l_o = _mm256_and_si256(_mm256_cmpgt_epi8(chars_o, a_m1), _mm256_cmpgt_epi8(f_p1, chars_o));
+
+        // Apply adjustments (subtract)
+        evens = _mm256_sub_epi8(evens, _mm256_and_si256(u_e, adj_uc));
+        odds  = _mm256_sub_epi8(odds,  _mm256_and_si256(u_o, adj_uc));
+        evens = _mm256_sub_epi8(evens, _mm256_and_si256(l_e, adj_lc));
+        odds  = _mm256_sub_epi8(odds,  _mm256_and_si256(l_o, adj_lc));
+
+        // (high<<4) | low
+        __m256i high = _mm256_slli_epi16(evens, 4);
+        __m256i out  = _mm256_or_si256(high, odds);
+
+        _mm256_storeu_si256((__m256i *)(result + i/2), out);
+    }
+
+    // tail (your scalar path is fine)
+    for (; i + 1 < TESTDATALEN; i += 2) {
+        unsigned char hi = testdata[i], lo = testdata[i + 1];
+        hi = (hi >= '0' && hi <= '9') ? hi - '0' :
+             (hi >= 'A' && hi <= 'F') ? hi - 'A' + 10 :
+             (hi >= 'a' && hi <= 'f') ? hi - 'a' + 10 : 0;
+        lo = (lo >= '0' && lo <= '9') ? lo - '0' :
+             (lo >= 'A' && lo <= 'F') ? lo - 'A' + 10 :
+             (lo >= 'a' && lo <= 'f') ? lo - 'a' + 10 : 0;
+        result[i/2] = (hi << 4) | lo;
+    }
+}
+
 // this SIMD code is much faster than the  lookup table code (test4)
 // this is 10x faster than the hex lookup table
 
 void superScalarSSE2(void)
 {
-	 unsigned char *result_sse2 = malloc(TESTDATALEN/2);
+    memset(result, 0, sizeof(result));
+    //strcpy((char *)result, "\0");
+	 //unsigned char *result_sse2 = malloc(TESTDATALEN/2);
 
     const __m128i ascii0 = _mm_set1_epi8('0');
     const __m128i adj_uc = _mm_set1_epi8(7);   // 'A'..'F'  => -7 after '0' subtract
@@ -132,7 +314,7 @@ void superScalarSSE2(void)
         __m128i high_nibbles = _mm_slli_epi16(evens, 4);
         __m128i bytes = _mm_or_si128(high_nibbles, odds);
 
-        _mm_storeu_si128((__m128i *)(result_sse2 + i / 2), bytes);
+        _mm_storeu_si128((__m128i *)(result + i / 2), bytes);
     }
 
     // Scalar tail
@@ -148,7 +330,7 @@ void superScalarSSE2(void)
               (low >= 'A' && low <= 'F') ? low - 'A' + 10 :
               (low >= 'a' && low <= 'f') ? low - 'a' + 10 : 0;
 
-        result_sse2[i / 2] = (high << 4) | low;
+        result[i / 2] = (high << 4) | low;
     }
 }
 
@@ -156,7 +338,8 @@ void superScalarSSE2(void)
 // however, this does not speed up the clob converion much, as most time is spent in the database
 void superScalarSSSE3(void)
 {
-    strcpy((char *)result, "\0");
+	//strcpy((char *)result, "\0");
+    memset(result, 0, sizeof(result));
 
     size_t i;
     for (i = 0; i + 32 <= TESTDATALEN; i += 32) {
@@ -250,7 +433,8 @@ void superScalarSSSE3(void)
 // --- SIMD2 Function ---
 void simd2_hex_to_bin(void) {
 	 
-    strcpy((char *)result, "\0");
+    memset(result, 0, sizeof(result));
+	//strcpy((char *)result, "\0");
     size_t i;
     for (i = 0; i + 32 <= TESTDATALEN; i += 32) {
         __m128i block1 = _mm_loadu_si128((const __m128i *)(testdata + i));
@@ -305,84 +489,14 @@ void simd2_hex_to_bin(void) {
     }
 }
 
-void simd_hex_to_bin_avx2(void) {
-    strcpy((char *)result, "\0");
-    size_t i;
-    for (i = 0; i + 32 <= TESTDATALEN; i += 32) {
-        __m256i chars = _mm256_loadu_si256((const __m256i *)(testdata + i));
-        __m256i idx_even = _mm256_setr_epi8(0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30, -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1);
-        __m256i idx_odd  = _mm256_setr_epi8(1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31, -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1);
-
-        __m256i evens = _mm256_shuffle_epi8(chars, idx_even);
-        __m256i odds  = _mm256_shuffle_epi8(chars, idx_odd);
-
-        __m256i zero = _mm256_set1_epi8('0');
-        __m256i evens_sub = _mm256_sub_epi8(evens, zero);
-        __m256i odds_sub  = _mm256_sub_epi8(odds,  zero);
-
-        __m256i evens_ascii = _mm256_add_epi8(evens_sub, zero);
-        __m256i odds_ascii  = _mm256_add_epi8(odds_sub,  zero);
-
-        __m256i upperA = _mm256_set1_epi8('A' - 1);
-        __m256i upperF = _mm256_set1_epi8('F' + 1);
-        __m256i lowerA = _mm256_set1_epi8('a' - 1);
-        __m256i lowerF = _mm256_set1_epi8('f' + 1);
-
-        //__m256i ucase_mask_e = _mm256_and_si256(_mm256_cmpgt_epi8(evens_ascii, upperA), _mm256_cmplt_epi8(evens_ascii, upperF));
-        //__m256i lcase_mask_e = _mm256_and_si256(_mm256_cmpgt_epi8(evens_ascii, lowerA), _mm256_cmplt_epi8(evens_ascii, lowerF));
-        //__m256i ucase_mask_o = _mm256_and_si256(_mm256_cmpgt_epi8(odds_ascii, upperA), _mm256_cmplt_epi8(odds_ascii, upperF));
-        //__m256i lcase_mask_o = _mm256_and_si256(_mm256_cmpgt_epi8(odds_ascii, lowerA), _mm256_cmplt_epi8(odds_ascii, lowerF));
-
-        __m256i ucase_mask_e = _mm256_and_si256(
-            _mm256_cmpgt_epi8(evens_ascii, upperA),
-            _mm256_cmpgt_epi8(upperF, evens_ascii));
-
-        __m256i lcase_mask_e = _mm256_and_si256(
-            _mm256_cmpgt_epi8(evens_ascii, lowerA),
-            _mm256_cmpgt_epi8(lowerF, evens_ascii));
-
-        __m256i ucase_mask_o = _mm256_and_si256(
-            _mm256_cmpgt_epi8(odds_ascii, upperA),
-            _mm256_cmpgt_epi8(upperF, odds_ascii));
-
-        __m256i lcase_mask_o = _mm256_and_si256(
-            _mm256_cmpgt_epi8(odds_ascii, lowerA),
-            _mm256_cmpgt_epi8(lowerF, odds_ascii));
-
-
-        evens_sub = _mm256_sub_epi8(evens_sub, _mm256_or_si256(_mm256_and_si256(ucase_mask_e, _mm256_set1_epi8(7)), _mm256_and_si256(lcase_mask_e, _mm256_set1_epi8(39))));
-        odds_sub  = _mm256_sub_epi8(odds_sub,  _mm256_or_si256(_mm256_and_si256(ucase_mask_o, _mm256_set1_epi8(7)), _mm256_and_si256(lcase_mask_o, _mm256_set1_epi8(39))));
-
-        __m256i high_shifted = _mm256_slli_epi16(evens_sub, 4);
-        __m256i combined = _mm256_or_si256(high_shifted, odds_sub);
-
-        __m128i avx2result = _mm256_castsi256_si128(_mm256_permute4x64_epi64(combined, 0xD8));
-        _mm_storeu_si128((__m128i *)(result + i / 2), avx2result);
-    }
-
-    // Process any remaining characters (less than 32)
-    for (; i < TESTDATALEN; i += 2) {
-        unsigned char high = testdata[i];
-        unsigned char low = testdata[i + 1];
-
-        high = (high >= '0' && high <= '9') ? high - '0' :
-               (high >= 'A' && high <= 'F') ? high - 'A' + 10 :
-               (high >= 'a' && high <= 'f') ? high - 'a' + 10 : 0;
-
-        low = (low >= '0' && low <= '9') ? low - '0' :
-              (low >= 'A' && low <= 'F') ? low - 'A' + 10 :
-              (low >= 'a' && low <= 'f') ? low - 'a' + 10 : 0;
-
-        result[i / 2] = (high << 4) | low;
-    }
-}
 
 void calcHex()
 {
     size_t i;
     char cur;
     unsigned char val;
-	 strcpy(result, "\0");
+    memset(result, 0, sizeof(result));
+	 //strcpy(result, "\0");
     for (i = 0; i < TESTDATALEN; i++) {
         cur = testdata[i];
         if (cur >= 97) {
@@ -407,7 +521,8 @@ void lookup256()
     size_t i;
     char cur;
     unsigned char val;
-	 strcpy(result, "\0");
+    memset(result, 0, sizeof(result));
+	 //strcpy(result, "\0");
     for (i = 0; i < TESTDATALEN; i++) {
         cur = testdata[i];
         val = base16_decoding_table1[(int)cur];
@@ -426,7 +541,8 @@ void lookup32k()
     size_t i;
     uint16_t *cur;
     unsigned char val;
-	 strcpy(result, "\0");
+    memset(result, 0, sizeof(result));
+	 //strcpy(result, "\0");
     for (i = 0; i < TESTDATALEN; i+=2) {
         cur = (uint16_t*)(testdata+i);
         // apply bitmask to make sure that the first bit is zero
@@ -440,7 +556,8 @@ void lookup64k()
     size_t i;
     uint16_t *cur;
     unsigned char val;
-	 strcpy(result, "\0");
+    memset(result, 0, sizeof(result));
+	 //strcpy(result, "\0");
     for (i = 0; i < TESTDATALEN; i+=2) {
         cur = (uint16_t*)(testdata+i);
         val = base16_decoding_table3[*cur];
@@ -461,7 +578,8 @@ void lookupBasic()
     };
     size_t i;
     unsigned char val;
-	 strcpy(result, "\0");
+	 //strcpy(result, "\0");
+    memset(result, 0, sizeof(result));
     for (i = 0; i < TESTDATALEN; i++) {
         val = lookup[(unsigned char)testdata[i]];
 
@@ -503,7 +621,7 @@ void writeHex(char *filename)
 int main() {
     struct timespec before, after;
     unsigned long long checksum;
-    int i;
+    int i,n;
     double elapsed;
 
 	 printf("TESTDATALEN: %d\n", TESTDATALEN);
@@ -515,6 +633,7 @@ int main() {
         calcHex();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
+	 n = i;
 	 writeResults("calcHex.dat");
 
     checksum = 0;
@@ -523,7 +642,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("arithmetic solution calcHex() took %3.6f seconds avg: %2.9f \n", elapsed, elapsed/NUMTESTS);
+    printf("arithmetic solution calcHex() took %3.6f for %d tests, seconds avg: %2.9f\n", elapsed, n, elapsed/NUMTESTS);
 
 	 // new SIMD2 
     clock_gettime(CLOCK_MONOTONIC, &before);
@@ -531,41 +650,25 @@ int main() {
         simd2_hex_to_bin();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
-
-    checksum = 0;
-    for (i = 0; i < TESTDATALEN/2; i++) {
-        checksum += result[i];
-    }
-    printf("\nchecksum: %llu\n", checksum);
-    elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup simd2_hex_to_bin() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
+	 n = i;
 	 writeResults("simd2_hex_to_bin.dat");
 
-	 // new AVX2 
-	 // this code is not working correctly
-    clock_gettime(CLOCK_MONOTONIC, &before);
-    for (i = 0; i < NUMTESTS; i++) {
-        simd_hex_to_bin_avx2();
-    }
-    clock_gettime(CLOCK_MONOTONIC, &after);
-
     checksum = 0;
     for (i = 0; i < TESTDATALEN/2; i++) {
         checksum += result[i];
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup simd_hex_to_bin_avx2() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
-	 writeResults("simd_hex_to_bin_avx2.dat");
-
+    printf("optimized lookup simd2_hex_to_bin() took %3.6f seconds for %d tests, avg: %2.9f\n", elapsed, n, elapsed/NUMTESTS);
 
 	 //-- SuperScalar SSE2
-	 // SSSE2 code is not working
     clock_gettime(CLOCK_MONOTONIC, &before);
     for (i = 0; i < NUMTESTS; i++) {
         superScalarSSE2();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
+	 n = i;
+	 writeResults("superScalerSSE2.dat");
 
     checksum = 0;
     for (i = 0; i < TESTDATALEN/2; i++) {
@@ -573,8 +676,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup superScalarSSE2() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
-	 writeResults("superScalerSSE2.dat");
+    printf("optimized lookup superScalarSSE2() took %3.6f for %d tests, seconds avg: %2.9f\n", elapsed, n, elapsed/NUMTESTS);
 
 	 //-- SuperScalar SSSE3
     clock_gettime(CLOCK_MONOTONIC, &before);
@@ -582,6 +684,8 @@ int main() {
         superScalarSSSE3();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
+	 n = i;
+	 writeResults("superScalerSSSE3.dat");
 
     checksum = 0;
     for (i = 0; i < TESTDATALEN/2; i++) {
@@ -589,8 +693,41 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup superScalarSSSE3() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
-	 writeResults("superScalerSSSE3.dat");
+    printf("optimized lookup superScalarSSSE3() took %3.6f seconds for %d tests, avg: %2.9f\n", elapsed, n, elapsed/NUMTESTS);
+
+	 //-- SuperScalar AVX2
+    clock_gettime(CLOCK_MONOTONIC, &before);
+    for (i = 0; i < NUMTESTS; i++) {
+        superScalarAVX2();
+    }
+    clock_gettime(CLOCK_MONOTONIC, &after);
+	 n = i;
+	 writeResults("superScalarAVX2.dat");
+
+    checksum = 0;
+    for (i = 0; i < TESTDATALEN/2; i++) {
+        checksum += result[i];
+    }
+    printf("\nchecksum: %llu\n", checksum);
+    elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
+    printf("optimized lookup superScalarAVX2() took %3.6f seconds for %d tests, avg: %2.9f\n", elapsed, n, elapsed/NUMTESTS);
+
+	 //-- SuperScalar AVX2 Optimized
+    clock_gettime(CLOCK_MONOTONIC, &before);
+    for (i = 0; i < NUMTESTS; i++) {
+        superScalarAVX2_opt();
+    }
+    clock_gettime(CLOCK_MONOTONIC, &after);
+	 n = i;
+	 writeResults("superScalarAVX2_opt.dat");
+
+    checksum = 0;
+    for (i = 0; i < TESTDATALEN/2; i++) {
+        checksum += result[i];
+    }
+    printf("\nchecksum: %llu\n", checksum);
+    elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
+    printf("optimized lookup superScalarAVX2_opt() took %3.6f seconds for %d tests, avg: %2.9f\n", elapsed, n, elapsed/NUMTESTS);
 
 	 // -----
 
@@ -600,6 +737,8 @@ int main() {
         lookupBasic();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
+	 n = i;
+	 writeResults("lookupBasic.dat");
 
     checksum = 0;
     for (i = 0; i < TESTDATALEN/2; i++) {
@@ -607,8 +746,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("optimized lookup lookupBasic() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
-	 writeResults("lookupBasic.dat");
+    printf("optimized lookup lookupBasic() took %3.6f seconds for %d tests,  avg: %2.9f\n", elapsed, n, elapsed/NUMTESTS);
 
 	 // -----
     // lookup256
@@ -617,6 +755,8 @@ int main() {
         lookup256();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
+	 n = i;
+	 writeResults("lookup256.dat");
 
     checksum = 0;
     for (i = 0; i < TESTDATALEN/2; i++) {
@@ -624,8 +764,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("256 entries table lookup256() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
-	 writeResults("lookup256.dat");
+    printf("256 entries table lookup256() took %3.6f seconds for %d tests, avg: %2.9f\n", elapsed, n, elapsed/NUMTESTS);
 
 	 // -----
 	 // lookup32k
@@ -634,6 +773,8 @@ int main() {
         lookup32k();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
+	 n = i;
+	 writeResults("lookup32k.dat");
 
     checksum = 0;
     for (i = 0; i < TESTDATALEN/2; i++) {
@@ -641,8 +782,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("32768 entries table lookup32k() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
-	 writeResults("lookup32k.dat");
+    printf("32768 entries table lookup32k() took %3.6f seconds for %d tests, avg: %2.9f\n", elapsed, n, elapsed/NUMTESTS);
 
 	 // -----
     // lookup64k
@@ -651,6 +791,8 @@ int main() {
         lookup64k();
     }
     clock_gettime(CLOCK_MONOTONIC, &after);
+	 n = i;
+	 writeResults("lookup64k.dat");
 
     checksum = 0;
     for (i = 0; i < TESTDATALEN/2; i++) {
@@ -658,8 +800,7 @@ int main() {
     }
     printf("\nchecksum: %llu\n", checksum);
     elapsed = difftime(after.tv_sec, before.tv_sec) + (after.tv_nsec - before.tv_nsec)/1.0e9;
-    printf("65536 entries table lookup64k() took %3.6f seconds avg: %2.9f\n", elapsed, elapsed/NUMTESTS);
-	 writeResults("lookup64k.dat");
+    printf("65536 entries table lookup64k() took %3.6f seconds for %d tests, avg: %2.9f\n", elapsed, n, elapsed/NUMTESTS);
 	 // -----
 
     return 0;
