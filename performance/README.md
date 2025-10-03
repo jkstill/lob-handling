@@ -99,7 +99,7 @@ Currently the Perl script reads the CLOB into a variable and converts it to to b
 Use C to convert the CLOB to BLOB.
 see blob.c
 
-See [hex-to-binary-performance](./hex-to-binary-performanced) for performance tests of hex to binary conversions.
+See [hex-to-binary-performance](hex-to-binary-performanced/) for performance tests of hex to binary conversions.
 
 There are several methods to convert hex to binary in C, several of the tested here.
 
