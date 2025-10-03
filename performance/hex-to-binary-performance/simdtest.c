@@ -6,11 +6,12 @@
 /*
 
 A couple hours spent with ChatGPT to try and get the SSE2 code working.
-
 Gave up on sse2, but the SSSE3 code is working well.
-
 Going to stick with SSE3.
- 
+
+Update: SSE2 code is now working, thanks to ChatGPT and CoPilot.
+
+gcc -msse2 -mssse3 -O3 -O2 -o simdtest simdtest.c
  
 */
 
@@ -26,28 +27,31 @@ void superScalarSSE2(void);
 
 // this SIMD code is much faster than the  lookup table code (test4)
 // this is 10x faster than the hex lookup table
+
 void superScalarSSE2(void)
 {
     const __m128i ascii0 = _mm_set1_epi8('0');
-    const __m128i nine   = _mm_set1_epi8(9);
-    const __m128i adj    = _mm_set1_epi8(7);
+    const __m128i adj_uc = _mm_set1_epi8(7);   // 'A'..'F'  => -7 after '0' subtract
+    const __m128i adj_lc = _mm_set1_epi8(39);  // 'a'..'f'  => -39 after '0' subtract
+
+    const __m128i A_m1 = _mm_set1_epi8('A' - 1);
+    const __m128i F_p1 = _mm_set1_epi8('F' + 1);
+    const __m128i a_m1 = _mm_set1_epi8('a' - 1);
+    const __m128i f_p1 = _mm_set1_epi8('f' + 1);
 
     size_t i;
     for (i = 0; i + 32 <= TESTDATALEN; i += 32) {
         const unsigned char* src = testdata + i;
 
-        // Load 32 characters into two 128-bit registers
         __m128i chunk1 = _mm_loadu_si128((const __m128i*)(src));
         __m128i chunk2 = _mm_loadu_si128((const __m128i*)(src + 16));
 
-        // Interleave manually to extract even and odd nibbles
-        // Step 1: unpack to words to isolate bytes
         __m128i lo1 = _mm_unpacklo_epi8(chunk1, _mm_setzero_si128());
         __m128i hi1 = _mm_unpackhi_epi8(chunk1, _mm_setzero_si128());
         __m128i lo2 = _mm_unpacklo_epi8(chunk2, _mm_setzero_si128());
         __m128i hi2 = _mm_unpackhi_epi8(chunk2, _mm_setzero_si128());
 
-        // Extract even bytes: byte 0,2,4,...30
+        // build evens (b0,b2,...,b30)
         __m128i even_bytes = _mm_setzero_si128();
         even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(lo1, 0), 0);
         even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(lo1, 2), 1);
@@ -58,7 +62,6 @@ void superScalarSSE2(void)
         even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(hi1, 4), 6);
         even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(hi1, 6), 7);
 
-        // Repeat for second 16 bytes
         __m128i even_bytes2 = _mm_setzero_si128();
         even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(lo2, 0), 0);
         even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(lo2, 2), 1);
@@ -69,12 +72,11 @@ void superScalarSSE2(void)
         even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(hi2, 4), 6);
         even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(hi2, 6), 7);
 
-        // Merge to get full even-byte vector
-        __m128i evens = _mm_castps_si128(
-            _mm_shuffle_ps(_mm_castsi128_ps(even_bytes), _mm_castsi128_ps(even_bytes2), _MM_SHUFFLE(1, 0, 1, 0))
-        );
+		  // Combine evens from both halves
+		  // this line by ChatGPT
+		  __m128i evens = _mm_packus_epi16(even_bytes, even_bytes2);
 
-        // Now do the same for odd-indexed characters
+        // build odds (b1,b3,...,b31)
         __m128i odd_bytes = _mm_setzero_si128();
         odd_bytes = _mm_insert_epi16(odd_bytes, _mm_extract_epi16(lo1, 1), 0);
         odd_bytes = _mm_insert_epi16(odd_bytes, _mm_extract_epi16(lo1, 3), 1);
@@ -95,28 +97,43 @@ void superScalarSSE2(void)
         odd_bytes2 = _mm_insert_epi16(odd_bytes2, _mm_extract_epi16(hi2, 5), 6);
         odd_bytes2 = _mm_insert_epi16(odd_bytes2, _mm_extract_epi16(hi2, 7), 7);
 
-        __m128i odds = _mm_castps_si128(
-            _mm_shuffle_ps(_mm_castsi128_ps(odd_bytes), _mm_castsi128_ps(odd_bytes2), _MM_SHUFFLE(1, 0, 1, 0))
-        );
 
-        // Now decode ASCII to nibbles
+		  // Combine odds from both halves
+		  __m128i odds = _mm_packus_epi16(odd_bytes, odd_bytes2);
+
+        // --- FIXED DECODE STAGE ---
+        // Keep ASCII copies for case detection
+        __m128i chars_e = evens;
+        __m128i chars_o = odds;
+
+        // Convert ASCII → [0..] by subtracting '0'
         evens = _mm_sub_epi8(evens, ascii0);
         odds  = _mm_sub_epi8(odds,  ascii0);
 
-        __m128i mask_e = _mm_cmpgt_epi8(evens, nine);
-        __m128i mask_o = _mm_cmpgt_epi8(odds,  nine);
+        // Uppercase mask: 'A' <= char <= 'F'
+        __m128i u_e = _mm_and_si128(_mm_cmpgt_epi8(chars_e, A_m1), _mm_cmplt_epi8(chars_e, F_p1));
+        __m128i u_o = _mm_and_si128(_mm_cmpgt_epi8(chars_o, A_m1), _mm_cmplt_epi8(chars_o, F_p1));
 
-        evens = _mm_add_epi8(evens, _mm_and_si128(mask_e, adj));
-        odds  = _mm_add_epi8(odds,  _mm_and_si128(mask_o, adj));
+        // Lowercase mask: 'a' <= char <= 'f'
+        __m128i l_e = _mm_and_si128(_mm_cmpgt_epi8(chars_e, a_m1), _mm_cmplt_epi8(chars_e, f_p1));
+        __m128i l_o = _mm_and_si128(_mm_cmpgt_epi8(chars_o, a_m1), _mm_cmplt_epi8(chars_o, f_p1));
 
-        // Combine nibbles
+        // Apply case-specific adjustments **by subtraction**
+        evens = _mm_sub_epi8(evens, _mm_and_si128(u_e, adj_uc));
+        odds  = _mm_sub_epi8(odds,  _mm_and_si128(u_o, adj_uc));
+
+        evens = _mm_sub_epi8(evens, _mm_and_si128(l_e, adj_lc));
+        odds  = _mm_sub_epi8(odds,  _mm_and_si128(l_o, adj_lc));
+        // --- END FIX ---
+
+        // Pack nibbles: (high<<4) | low
         __m128i high_nibbles = _mm_slli_epi16(evens, 4);
         __m128i bytes = _mm_or_si128(high_nibbles, odds);
 
         _mm_storeu_si128((__m128i *)(result_sse2 + i / 2), bytes);
     }
 
-    // Scalar fallback for remaining
+    // Scalar tail
     for (; i + 1 < TESTDATALEN; i += 2) {
         unsigned char high = testdata[i];
         unsigned char low  = testdata[i + 1];
