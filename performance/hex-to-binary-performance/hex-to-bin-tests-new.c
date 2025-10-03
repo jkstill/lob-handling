@@ -27,79 +27,118 @@ unsigned char result[TESTDATALEN/2];
 
 // this SIMD code is much faster than the  lookup table code (test4)
 // this is 10x faster than the hex lookup table
-// cannot get sse2 code to work properly
-// spent a couple hours on this with ChatGPT, no success
-// stick with SSSE3
+
 void superScalarSSE2(void)
 {
-    strcpy((char *)result, "\0");
+	 unsigned char *result_sse2 = malloc(TESTDATALEN/2);
 
-    // Constants stored in arrays
-    static const unsigned char lookup_high_values[16] = {
-        0x00, 0x10, 0x20, 0x30,
-        0x40, 0x50, 0x60, 0x70,
-        0x80, 0x90, 0xA0, 0xB0,
-        0xC0, 0xD0, 0xE0, 0xF0
-    };
+    const __m128i ascii0 = _mm_set1_epi8('0');
+    const __m128i adj_uc = _mm_set1_epi8(7);   // 'A'..'F'  => -7 after '0' subtract
+    const __m128i adj_lc = _mm_set1_epi8(39);  // 'a'..'f'  => -39 after '0' subtract
 
-    static const unsigned char lookup_low_values[16] = {
-        0x00, 0x01, 0x02, 0x03,
-        0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0A, 0x0B,
-        0x0C, 0x0D, 0x0E, 0x0F
-    };
-
-    // Load constants into __m128i variables at runtime
-    __m128i lookup_high = _mm_loadu_si128((const __m128i *)lookup_high_values);
-    __m128i lookup_low = _mm_loadu_si128((const __m128i *)lookup_low_values);
+    const __m128i A_m1 = _mm_set1_epi8('A' - 1);
+    const __m128i F_p1 = _mm_set1_epi8('F' + 1);
+    const __m128i a_m1 = _mm_set1_epi8('a' - 1);
+    const __m128i f_p1 = _mm_set1_epi8('f' + 1);
 
     size_t i;
     for (i = 0; i + 32 <= TESTDATALEN; i += 32) {
-        // Load 32 hex characters
-        __m128i chars_high = _mm_loadu_si128((const __m128i *)(testdata + i));
-        __m128i chars_low = _mm_loadu_si128((const __m128i *)(testdata + i + 16));
+        const unsigned char* src = testdata + i;
 
-        // Convert hex characters to their numeric values
-        // For simplicity, let's assume that all characters are valid hex digits (0-9, A-F, a-f)
-        // You should add validation if necessary
+        __m128i chunk1 = _mm_loadu_si128((const __m128i*)(src));
+        __m128i chunk2 = _mm_loadu_si128((const __m128i*)(src + 16));
 
-        // Subtract '0' or 'A'-10 to get the numeric value
-        __m128i mask_num = _mm_set1_epi8(0x0F);
+        __m128i lo1 = _mm_unpacklo_epi8(chunk1, _mm_setzero_si128());
+        __m128i hi1 = _mm_unpackhi_epi8(chunk1, _mm_setzero_si128());
+        __m128i lo2 = _mm_unpacklo_epi8(chunk2, _mm_setzero_si128());
+        __m128i hi2 = _mm_unpackhi_epi8(chunk2, _mm_setzero_si128());
 
-        // Process high nibbles
-        __m128i high_nibbles = _mm_sub_epi8(chars_high, _mm_set1_epi8('0'));
-        __m128i high_mask = _mm_cmpgt_epi8(high_nibbles, _mm_set1_epi8(9));
-        high_nibbles = _mm_add_epi8(high_nibbles, _mm_and_si128(high_mask, _mm_set1_epi8(39))); // Adjust for 'A'-'0'-10
+        // build evens (b0,b2,...,b30)
+        __m128i even_bytes = _mm_setzero_si128();
+        even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(lo1, 0), 0);
+        even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(lo1, 2), 1);
+        even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(lo1, 4), 2);
+        even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(lo1, 6), 3);
+        even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(hi1, 0), 4);
+        even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(hi1, 2), 5);
+        even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(hi1, 4), 6);
+        even_bytes = _mm_insert_epi16(even_bytes, _mm_extract_epi16(hi1, 6), 7);
 
-        // Process low nibbles
-        __m128i low_nibbles = _mm_sub_epi8(chars_low, _mm_set1_epi8('0'));
-        __m128i low_mask = _mm_cmpgt_epi8(low_nibbles, _mm_set1_epi8(9));
-        low_nibbles = _mm_add_epi8(low_nibbles, _mm_and_si128(low_mask, _mm_set1_epi8(39))); // Adjust for 'A'-'0'-10
+        __m128i even_bytes2 = _mm_setzero_si128();
+        even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(lo2, 0), 0);
+        even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(lo2, 2), 1);
+        even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(lo2, 4), 2);
+        even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(lo2, 6), 3);
+        even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(hi2, 0), 4);
+        even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(hi2, 2), 5);
+        even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(hi2, 4), 6);
+        even_bytes2 = _mm_insert_epi16(even_bytes2, _mm_extract_epi16(hi2, 6), 7);
 
-        // Pack nibbles into bytes
-        //__m128i high_nibbles_shifted = _mm_slli_epi16(high_nibbles, 4);
-        //__m128i bytes = _mm_or_si128(high_nibbles_shifted, low_nibbles);
+		  // Combine evens from both halves
+		  // this line by ChatGPT
+		  __m128i evens = _mm_packus_epi16(even_bytes, even_bytes2);
 
-// Shift high nibbles into upper 4 bits of each byte
-__m128i high_shifted = _mm_slli_epi16(high_nibbles, 4);
+        // build odds (b1,b3,...,b31)
+        __m128i odd_bytes = _mm_setzero_si128();
+        odd_bytes = _mm_insert_epi16(odd_bytes, _mm_extract_epi16(lo1, 1), 0);
+        odd_bytes = _mm_insert_epi16(odd_bytes, _mm_extract_epi16(lo1, 3), 1);
+        odd_bytes = _mm_insert_epi16(odd_bytes, _mm_extract_epi16(lo1, 5), 2);
+        odd_bytes = _mm_insert_epi16(odd_bytes, _mm_extract_epi16(lo1, 7), 3);
+        odd_bytes = _mm_insert_epi16(odd_bytes, _mm_extract_epi16(hi1, 1), 4);
+        odd_bytes = _mm_insert_epi16(odd_bytes, _mm_extract_epi16(hi1, 3), 5);
+        odd_bytes = _mm_insert_epi16(odd_bytes, _mm_extract_epi16(hi1, 5), 6);
+        odd_bytes = _mm_insert_epi16(odd_bytes, _mm_extract_epi16(hi1, 7), 7);
 
-// OR high and low nibbles together (still 16-bit lanes)
-__m128i combined = _mm_or_si128(high_shifted, low_nibbles);
+        __m128i odd_bytes2 = _mm_setzero_si128();
+        odd_bytes2 = _mm_insert_epi16(odd_bytes2, _mm_extract_epi16(lo2, 1), 0);
+        odd_bytes2 = _mm_insert_epi16(odd_bytes2, _mm_extract_epi16(lo2, 3), 1);
+        odd_bytes2 = _mm_insert_epi16(odd_bytes2, _mm_extract_epi16(lo2, 5), 2);
+        odd_bytes2 = _mm_insert_epi16(odd_bytes2, _mm_extract_epi16(lo2, 7), 3);
+        odd_bytes2 = _mm_insert_epi16(odd_bytes2, _mm_extract_epi16(hi2, 1), 4);
+        odd_bytes2 = _mm_insert_epi16(odd_bytes2, _mm_extract_epi16(hi2, 3), 5);
+        odd_bytes2 = _mm_insert_epi16(odd_bytes2, _mm_extract_epi16(hi2, 5), 6);
+        odd_bytes2 = _mm_insert_epi16(odd_bytes2, _mm_extract_epi16(hi2, 7), 7);
 
-// Pack 16-bit lanes down to 8-bit
-__m128i bytes = _mm_packus_epi16(combined, _mm_setzero_si128());
 
-// Store the lower 16 bytes (128 bits)
-_mm_storeu_si128((__m128i *)(result + i / 2), bytes);
+		  // Combine odds from both halves
+		  __m128i odds = _mm_packus_epi16(odd_bytes, odd_bytes2);
 
-        // Store the result
-        //_mm_storeu_si128((__m128i *)(result + i / 2), bytes);
+        // --- FIXED DECODE STAGE ---
+        // Keep ASCII copies for case detection
+        __m128i chars_e = evens;
+        __m128i chars_o = odds;
+
+        // Convert ASCII → [0..] by subtracting '0'
+        evens = _mm_sub_epi8(evens, ascii0);
+        odds  = _mm_sub_epi8(odds,  ascii0);
+
+        // Uppercase mask: 'A' <= char <= 'F'
+        __m128i u_e = _mm_and_si128(_mm_cmpgt_epi8(chars_e, A_m1), _mm_cmplt_epi8(chars_e, F_p1));
+        __m128i u_o = _mm_and_si128(_mm_cmpgt_epi8(chars_o, A_m1), _mm_cmplt_epi8(chars_o, F_p1));
+
+        // Lowercase mask: 'a' <= char <= 'f'
+        __m128i l_e = _mm_and_si128(_mm_cmpgt_epi8(chars_e, a_m1), _mm_cmplt_epi8(chars_e, f_p1));
+        __m128i l_o = _mm_and_si128(_mm_cmpgt_epi8(chars_o, a_m1), _mm_cmplt_epi8(chars_o, f_p1));
+
+        // Apply case-specific adjustments **by subtraction**
+        evens = _mm_sub_epi8(evens, _mm_and_si128(u_e, adj_uc));
+        odds  = _mm_sub_epi8(odds,  _mm_and_si128(u_o, adj_uc));
+
+        evens = _mm_sub_epi8(evens, _mm_and_si128(l_e, adj_lc));
+        odds  = _mm_sub_epi8(odds,  _mm_and_si128(l_o, adj_lc));
+        // --- END FIX ---
+
+        // Pack nibbles: (high<<4) | low
+        __m128i high_nibbles = _mm_slli_epi16(evens, 4);
+        __m128i bytes = _mm_or_si128(high_nibbles, odds);
+
+        _mm_storeu_si128((__m128i *)(result_sse2 + i / 2), bytes);
     }
 
-    // Process any remaining characters
-    for (; i < TESTDATALEN; i += 2) {
+    // Scalar tail
+    for (; i + 1 < TESTDATALEN; i += 2) {
         unsigned char high = testdata[i];
-        unsigned char low = testdata[i + 1];
+        unsigned char low  = testdata[i + 1];
 
         high = (high >= '0' && high <= '9') ? high - '0' :
                (high >= 'A' && high <= 'F') ? high - 'A' + 10 :
@@ -109,10 +148,9 @@ _mm_storeu_si128((__m128i *)(result + i / 2), bytes);
               (low >= 'A' && low <= 'F') ? low - 'A' + 10 :
               (low >= 'a' && low <= 'f') ? low - 'a' + 10 : 0;
 
-        result[i / 2] = (high << 4) | low;
+        result_sse2[i / 2] = (high << 4) | low;
     }
 }
-
 
 // this SIMD code is much faster than the  lookup table code (lookup64k)
 // however, this does not speed up the clob converion much, as most time is spent in the database
