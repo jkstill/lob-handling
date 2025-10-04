@@ -2,6 +2,7 @@
 #include <time.h>
 #include <inttypes.h>
 #include <string.h>
+#include <errno.h>
 #include <emmintrin.h> // SSE2 header
 #include <immintrin.h>  // AVX2, SSE
 #include <tmmintrin.h>  // for _mm_shuffle_epi8 (SSSE3)							  
@@ -602,20 +603,34 @@ void writeResults(char *filename)
 	 fclose(fp);
 }
 
-void writeHex(char *filename)
+void writeHex(const char *filename)
 {
-	 FILE *fp;
-	 char fqnName[256] = "data/";
-	 long unsigned int bytesWritten;
-	 strcat(fqnName, filename);
-	 //printf("writing to %s\n", fqnName);
-	 fp = fopen(fqnName, "w");
-	 bytesWritten = fwrite(testdata, 1, TESTDATALEN, fp);
-	 fclose(fp);
+    char fqnName[256];
+    FILE *fp;
 
+    // build path safely
+    int n = snprintf(fqnName, sizeof fqnName, "data/%s", filename);
+    if (n < 0 || (size_t)n >= sizeof fqnName) {
+        fprintf(stderr, "Path too long: %s\n", filename);
+        return;
+    }
+
+    fp = fopen(fqnName, "w");            // or "wb" if you want binary mode on Windows
+    if (!fp) {
+        perror("fopen");
+        return;
+    }
+
+    size_t bytesWritten = fwrite(testdata, 1, TESTDATALEN, fp);
+    if (bytesWritten != TESTDATALEN) {
+        fprintf(stderr, "fwrite short write: %zu of %zu\n", bytesWritten, (size_t)TESTDATALEN);
+        // optionally: handle errno or retry
+    }
+
+    if (fclose(fp) != 0) {
+        perror("fclose");
+    }
 }
-
-
 
 
 int main() {

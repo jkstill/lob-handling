@@ -290,7 +290,6 @@ static void avx2_to_bin(const unsigned char *hex, unsigned char *bin, size_t n) 
     const __m256i ascii0 = _mm256_set1_epi8('0');
     const __m256i A_m1 = _mm256_set1_epi8('A'-1), F_p1 = _mm256_set1_epi8('F'+1);
     const __m256i a_m1 = _mm256_set1_epi8('a'-1), f_p1 = _mm256_set1_epi8('f'+1);
-    const __m256i adj_uc = _mm256_set1_epi8(7), adj_lc = _mm256_set1_epi8(39);
 
     const __m256i idxEven = _mm256_setr_epi8(
         0,2,4,6,8,10,12,14, (char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,(char)0x80,
