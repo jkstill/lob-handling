@@ -20,10 +20,10 @@ SIMD extensions are sub-ISAs
 
 SSE2, AVX2, or AVX-512, are all extensions to the base x86-64 ISA — new instruction sets that add wider vector registers and new operations.
 
-SIMD Extension	Year	Vector Width	Notes
-SSE (SSE, SSE2, SSE3)	~1999-2004	128-bit	Legacy SIMD foundation
-AVX / AVX2	~2011-2013	256-bit	Wider vectors, 3-operand form
-AVX-512	~2016+	512-bit	Very wide, mask registers, lots of variants
+SIMD Extension   Year   Vector Width   Notes
+SSE (SSE, SSE2, SSE3)   ~1999-2004   128-bit   Legacy SIMD foundation
+AVX / AVX2   ~2011-2013   256-bit   Wider vectors, 3-operand form
+AVX-512   ~2016+   512-bit   Very wide, mask registers, lots of variants
 
 Each new SIMD “ISA extension” means new instructions the CPU can execute — e.g., _mm512_add_epi8 is an AVX-512 instruction, _mm_add_epi8 is an SSE2 instruction.
 
@@ -109,13 +109,14 @@ Registers: YMM0 … YMM15
 
 Registers: ZMM0 … ZMM31, plus mask registers (k0–k7) for per-lane predication.
 
-⚙️ SIMD throughput summary
-ISA	Register size	Parallel bytes	Typical CPU year	Notes
-Scalar	8–64 bits	1	Always	Baseline
-SSE2	128 bits	16	2001+	Minimum for x86-64
-AVX	256 bits	32	2011+	First 256-bit ops
-AVX2	256 bits	32	2013+	Integer SIMD fully supported
-AVX-512	512 bits	64	2016+	Masking + many subextensions
+SIMD throughput summary
+
+ISA       Register size   Parallel bytes   Typical CPU year   Notes
+Scalar        8–64 bits          1                   Always   Baseline
+SSE2           128 bits         16                    2001+   Minimum for x86-64
+AVX            256 bits         32                    2011+   First 256-bit ops
+AVX2           256 bits         32                    2013+   Integer SIMD fully supported
+AVX-512        512 bits         64                    2016+   Masking + many subextensions
 
 ===================================
 
