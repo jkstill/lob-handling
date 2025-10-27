@@ -1,0 +1,10 @@
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: hexsimd
+Description: SIMD-accelerated hex<->bin conversion library with runtime CPU dispatch
+Version: @VERSION@
+Cflags: -I${includedir}
+Libs: -L${libdir} -lhexsimd

@@ -1,81 +1,105 @@
-# Makefile for hexsimd
-# Usage:
-#   make universal    # ship-one, run-anywhere (runtime CPUID picks path)
-#   make native       # build only what this machine supports
-#   make clean
-
+# Portable Makefile for hexsimd: static + shared + pkg-config + test
 CC      ?= gcc
 AR      ?= ar
-CFLAGS  ?= -O3 -Wall -Wextra -fPIC
-LDFLAGS ?=
-LIB     := libhexsimd.a
-HDR     := hexsimd.h
-SRC     := hexsimd.c
+RANLIB  ?= ranlib
+INSTALL ?= install
 
-# Probe program to detect runtime-supported ISAs for 'native' build.
-# It prints: FEATURES: sse2 avx avx2 avx512bw avx512vl (whatever applies)
-PROBE := probe_isa
-PROBE_SRC := $(PROBE).c
-$(PROBE_SRC):
-	@printf '%s\n' '#include <stdio.h>' > $(PROBE_SRC)
-	@printf '%s\n' '#include <immintrin.h>' >> $(PROBE_SRC)
-	@printf '%s\n' 'int main(){' >> $(PROBE_SRC)
-	@printf '%s\n' '  unsigned a,b,c,d; int sse2=0,avx=0,avx2=0,avx512bw=0,avx512vl=0; ' >> $(PROBE_SRC)
-	@printf '%s\n' '  __asm__ __volatile__("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"a"(1),"c"(0));' >> $(PROBE_SRC)
-	@printf '%s\n' '  sse2 = !!(d & (1u<<26));' >> $(PROBE_SRC)
-	@printf '%s\n' '  int osxsave = !!(c & (1u<<27));' >> $(PROBE_SRC)
-	@printf '%s\n' '  unsigned long long xcr0=0; if(osxsave){ unsigned eax,edx; __asm__ __volatile__(".byte 0x0f,0x01,0xd0":"=a"(eax),"=d"(edx):"c"(0)); xcr0=((unsigned long long)edx<<32)|eax; }' >> $(PROBE_SRC)
-	@printf '%s\n' '  int os_avx = osxsave && ((xcr0 & 0x6)==0x6); avx = os_avx && !!(c & (1u<<28));' >> $(PROBE_SRC)
-	@printf '%s\n' '  __asm__ __volatile__("cpuid":"=a"(a),"=b"(b),"=c"(c),"=d"(d):"a"(7),"c"(0));' >> $(PROBE_SRC)
-	@printf '%s\n' '  avx2 = avx && !!(b & (1u<<5));' >> $(PROBE_SRC)
-	@printf '%s\n' '  int os_avx512 = osxsave && ((xcr0 & 0xE0)==0xE0);' >> $(PROBE_SRC)
-	@printf '%s\n' '  avx512bw = os_avx512 && !!(b & (1u<<30));' >> $(PROBE_SRC)
-	@printf '%s\n' '  avx512vl = os_avx512 && !!(b & (1u<<31));' >> $(PROBE_SRC)
-	@printf '%s\n' '  printf("FEATURES:"); if(sse2)printf(" sse2"); if(avx)printf(" avx"); if(avx2)printf(" avx2"); if(avx512bw)printf(" avx512bw"); if(avx512vl)printf(" avx512vl"); printf("\n"); return 0; }' >> $(PROBE_SRC)
+# ----- outputs -----
+LIB_NAME   := hexsimd
+MAJOR      := 1
+MINOR      := 0
+PATCH      := 0
+SOVER      := $(MAJOR)
+FULLVER    := $(MAJOR).$(MINOR).$(PATCH)
 
-.PHONY: universal native clean
+LIB_STATIC := lib$(LIB_NAME).a
+LIB_SHARED := lib$(LIB_NAME).so.$(FULLVER)
+SONAME     := lib$(LIB_NAME).so.$(SOVER)
 
-# =========
-# Universal
-# =========
-universal: CFLAGS += -DTEST_HEX
-universal: CFLAGS += -DHEXSIMD_UNIVERSAL
-universal: $(LIB) hextest hexsimd
+BIN_TEST   := tests/test_shared
+HEXSIMD    := hexsimd
 
-# For universal, we rely on per-function #pragma GCC target inside hexsimd.c,
-# so a single object is fine.
-$(LIB): hexsimd.o
+# ----- dirs -----
+SRC := hexsimd.c
+HDR := hexsimd.h
+
+PREFIX  ?= /usr/local
+LIBDIR  := $(PREFIX)/lib
+INCDIR  := $(PREFIX)/include
+PKGDIR  := $(LIBDIR)/pkgconfig
+
+# ----- flags -----
+# Baseline ISA. DO NOT enable AVX globally.
+CFLAGS_BASE ?= -O3 -Wall -Wextra -fPIC -fvisibility=hidden -march=x86-64 -mno-avx -mno-avx2 -mno-avx512f
+LDFLAGS     ?=
+# For the shared object: versioned SONAME and RUNPATH to $(LIBDIR) for convenience
+LDFLAGS_SO  ?= -shared -Wl,-soname,$(SONAME)
+
+# Optional knobs
+ifdef NATIVE
+  CFLAGS_BASE += -mtune=native
+endif
+ifdef NO_AVX2
+  CFLAGS_BASE += -DHEXSIMD_NO_AVX2
+endif
+ifdef NO_AVX512
+  CFLAGS_BASE += -DHEXSIMD_NO_AVX512
+endif
+
+# ----- rules -----
+.PHONY: all
+all: $(LIB_STATIC) $(LIB_SHARED) $(BIN_TEST) $(HEXSIMD)
+
+# Static lib
+$(LIB_STATIC): hexsimd.o
 	$(AR) rcs $@ $^
+	$(RANLIB) $@
 
+# Shared lib (versioned)
+$(LIB_SHARED): hexsimd.pic.o
+	$(CC) $(LDFLAGS_SO) $^ -o $@ $(LDFLAGS)
+	@ln -sf $(LIB_SHARED) lib$(LIB_NAME).so
+	@ln -sf $(LIB_SHARED) $(SONAME)
+
+$(HEXSIMD): $(SRC) $(HDR)
+	$(CC) $(CFLAGS_BASE) -DTEST_HEX $(SRC) -o $@
+
+# PIC objects for the shared lib
+hexsimd.pic.o: $(SRC) $(HDR)
+	$(CC) $(CFLAGS_BASE) -DHEXSIMD_BUILD -c $(SRC) -o $@
+
+# non-PIC object is fine too (we already use -fPIC in base flags, but keep both)
 hexsimd.o: $(SRC) $(HDR)
-	$(CC) $(CFLAGS) -mavx512bw -mavx512vl -c $(SRC) -o $@
+	$(CC) $(CFLAGS_BASE) -c $(SRC) -o $@
 
-hexsimd: $(SRC) $(HDR)
-	$(CC) -O3 -Wall -Wextra -mavx512bw -mavx512vl -DTEST_HEX hexsimd.c -o hexsimd
+# Test program (links the shared lib via pkg-config once installed,
+# but also link against local .so if not installed yet)
+$(BIN_TEST): tests/test_shared.c $(LIB_SHARED) $(HDR)
+	$(CC) -I. $(CFLAGS_BASE) $< -L. -l$(LIB_NAME) -Wl,-rpath,'$$ORIGIN/..' -o $@
 
-hextest: hextest.c $(LIB) $(HDR)
-	$(CC) $(CFLAGS) $< -L. -lhexsimd -o $@
+# ----- pkg-config -----
+PC := $(LIB_NAME).pc
+$(PC): hexsimd.pc.in
+	sed -e 's|@PREFIX@|$(PREFIX)|g' \
+	    -e 's|@VERSION@|$(FULLVER)|g' \
+	    $< > $@
 
-# =========
-# Native
-# =========
-native: $(PROBE_SRC)
-	@$(CC) $(CFLAGS) -o $(PROBE) $(PROBE_SRC)
-	@feat=`./$(PROBE)`; \
-	echo "$$feat"; \
-	rm -f $(PROBE) $(PROBE_SRC); \
-	case "$$feat" in \
-	  *avx512bw*avx512vl*) echo "Building with AVX-512BW/VL"; \
-	    $(CC) $(CFLAGS) -mavx512bw -mavx512vl -DHEXSIMD_NATIVE -c $(SRC) -o hexsimd.o ;; \
-	  *avx2*) echo "Building with AVX2"; \
-	    $(CC) $(CFLAGS) -mavx2 -DHEXSIMD_NATIVE -c $(SRC) -o hexsimd.o ;; \
-	  *sse2*) echo "Building with SSE2"; \
-	    $(CC) $(CFLAGS) -msse2 -DHEXSIMD_NATIVE -c $(SRC) -o hexsimd.o ;; \
-	  *) echo "Building scalar only"; \
-	    $(CC) $(CFLAGS) -DHEXSIMD_NATIVE -c $(SRC) -o hexsimd.o ;; \
-	esac
-	$(AR) rcs $(LIB) hexsimd.o
-	$(CC) $(CFLAGS) hextest.c -L. -lhexsimd -o hextest
+.PHONY: install uninstall
+install: $(LIB_STATIC) $(LIB_SHARED) $(HDR) $(PC)
+	$(INSTALL) -d $(LIBDIR) $(INCDIR) $(PKGDIR)
+	$(INSTALL) -m 644 $(LIB_STATIC) $(LIBDIR)/
+	$(INSTALL) -m 755 $(LIB_SHARED) $(LIBDIR)/
+	cd $(LIBDIR) && ln -sf $(LIB_SHARED) $(SONAME) && ln -sf $(LIB_SHARED) lib$(LIB_NAME).so
+	$(INSTALL) -m 644 $(HDR)       $(INCDIR)/
+	$(INSTALL) -m 644 $(PC)        $(PKGDIR)/
+
+uninstall:
+	rm -f $(LIBDIR)/$(LIB_STATIC) \
+	      $(LIBDIR)/$(LIB_SHARED) \
+	      $(LIBDIR)/$(SONAME) \
+	      $(LIBDIR)/lib$(LIB_NAME).so \
+	      $(INCDIR)/$(HDR) \
+	      $(PKGDIR)/$(PC)
 
 # =========
 # Helpers
@@ -95,7 +119,14 @@ hextest.c:
 	@printf '%s\n' '  printf("roundtrip: %s\n", back);' >> $@
 	@printf '%s\n' '  return 0; }' >> $@
 
-clean:
-	rm -f *.o $(LIB) hexsimd hextest hextest.c $(PROBE) $(PROBE_SRC)
+.PHONY: selftest
+selftest: $(BIN_TEST)
+	@set -e; \
+	for m in scalar sse2 avx2 avx512; do \
+	  echo "== $$m =="; HEXSIMD_FORCE=$$m ./$(BIN_TEST) || exit $$?; \
+	done
 
+.PHONY: clean
+clean:
+	rm -f hexsimd hextest hextest.c *.o *.so* $(LIB_STATIC) $(LIB_SHARED) $(PC) $(BIN_TEST)
 
