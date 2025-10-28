@@ -1,3 +1,4 @@
+// gcc -O3 -Wall -Wextra -mavx512bw -mavx512vl -o probe_isa probe_isa.c 
 #include <stdio.h>
 #include <immintrin.h>
 int main(){
