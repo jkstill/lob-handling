@@ -165,31 +165,67 @@ XS_EUPXS(XS_Data__HexConverter_hex_to_bytes)
 {
     dVAR; dXSARGS;
     if (items < 1 || items > 2)
-       croak_xs_usage(cv,  "src, strict = 1");
+       croak_xs_usage(cv,  "src, strict= true");
     {
 	const char*	src = (const char *)SvPV_nolen(ST(0))
 ;
 	bool	strict;
-	ptrdiff_t	RETVAL;
 
 	if (items < 2)
-	    strict = 1;
+	    strict = true;
 	else {
 	    strict = (bool)SvTRUE(ST(1))
 ;
 	}
 #line 15 "HexConverter.xs"
     STRLEN len = strlen(src);
-    uint8_t* dst = (uint8_t*)safemalloc(len / 2);
-    RETVAL = hex_to_bytes(src, len, dst, strict);
-    if (RETVAL < 0) {
-        safefree(dst);
+    // Allocate buffer for the output. The result is half the length of the hex string.
+    SV* retval_sv = newSV(len / 2);
+    uint8_t* dst = (uint8_t*)SvPVX(retval_sv);
+
+    ptrdiff_t res = hex_to_bytes(src, len, dst, strict);
+
+    if (res < 0) {
+        // On error (invalid input, odd length), return undef
         XSRETURN_EMPTY;
+    } else {
+        // Set the length of the SV and push it to the stack
+        SvCUR_set(retval_sv, res);
+        SvPOK_on(retval_sv);
+        ST(0) = retval_sv;
+        XSRETURN(1);
     }
-    ST(0) = sv_newmortal();
-    sv_setpvn(ST(0), (const char*)dst, RETVAL);
-    safefree(dst);
-#line 193 "HexConverter.c"
+#line 199 "HexConverter.c"
+    }
+    XSRETURN(1);
+}
+
+
+XS_EUPXS(XS_Data__HexConverter_bytes_to_hex); /* prototype to pass -Wmissing-prototypes */
+XS_EUPXS(XS_Data__HexConverter_bytes_to_hex)
+{
+    dVAR; dXSARGS;
+    if (items != 1)
+       croak_xs_usage(cv,  "bytes_sv");
+    {
+	SV*	bytes_sv = ST(0)
+;
+#line 36 "HexConverter.xs"
+    STRLEN len;
+    const char* src = SvPV(bytes_sv, len);
+
+    // Allocate buffer for the output. The result is twice the length of the byte string.
+    SV* retval_sv = newSV(len * 2);
+    char* dst = SvPVX(retval_sv);
+
+    ptrdiff_t res = bytes_to_hex((const uint8_t*)src, len, dst);
+
+    // Set the length of the SV and push it to the stack
+    SvCUR_set(retval_sv, res);
+    SvPOK_on(retval_sv);
+    ST(0) = retval_sv;
+    XSRETURN(1);
+#line 229 "HexConverter.c"
     }
     XSRETURN(1);
 }
@@ -204,9 +240,8 @@ XS_EUPXS(XS_Data__HexConverter_hexsimd_hex2bin_impl_name)
     {
 	const char *	RETVAL;
 	dXSTARG;
-#line 29 "HexConverter.xs"
-    RETVAL = hexsimd_hex2bin_impl_name();
-#line 210 "HexConverter.c"
+
+	RETVAL = hexsimd_hex2bin_impl_name();
 	sv_setpv(TARG, RETVAL);
 	XSprePUSH;
 	PUSHTARG;
@@ -224,34 +259,11 @@ XS_EUPXS(XS_Data__HexConverter_hexsimd_bin2hex_impl_name)
     {
 	const char *	RETVAL;
 	dXSTARG;
-#line 36 "HexConverter.xs"
-    RETVAL = hexsimd_bin2hex_impl_name();
-#line 230 "HexConverter.c"
+
+	RETVAL = hexsimd_bin2hex_impl_name();
 	sv_setpv(TARG, RETVAL);
 	XSprePUSH;
 	PUSHTARG;
-    }
-    XSRETURN(1);
-}
-
-
-XS_EUPXS(XS_Data__HexConverter_bytes_to_hex); /* prototype to pass -Wmissing-prototypes */
-XS_EUPXS(XS_Data__HexConverter_bytes_to_hex)
-{
-    dVAR; dXSARGS;
-    if (items != 0)
-       croak_xs_usage(cv,  "");
-    {
-#line 43 "HexConverter.xs"
-    STRLEN len;
-    const char* s = SvPV(ST(0), len);
-    char* dst = (char*)safemalloc(len * 2 + 1);
-    ptrdiff_t ret = bytes_to_hex((const uint8_t*)s, len, dst);
-    dst[ret] = '\0';
-    ST(0) = sv_newmortal();
-    sv_setpvn(ST(0), dst, ret);
-    safefree(dst);
-#line 255 "HexConverter.c"
     }
     XSRETURN(1);
 }
@@ -284,10 +296,10 @@ XS_EXTERNAL(boot_Data__HexConverter)
 #  endif
 #endif
 
-        newXS_deffile("Data::HexConverter::hex_to_bytes", XS_Data__HexConverter_hex_to_bytes);
-        newXS_deffile("Data::HexConverter::hexsimd_hex2bin_impl_name", XS_Data__HexConverter_hexsimd_hex2bin_impl_name);
-        newXS_deffile("Data::HexConverter::hexsimd_bin2hex_impl_name", XS_Data__HexConverter_hexsimd_bin2hex_impl_name);
-        newXS_deffile("Data::HexConverter::bytes_to_hex", XS_Data__HexConverter_bytes_to_hex);
+        (void)newXSproto_portable("Data::HexConverter::hex_to_bytes", XS_Data__HexConverter_hex_to_bytes, file, "$;$");
+        (void)newXSproto_portable("Data::HexConverter::bytes_to_hex", XS_Data__HexConverter_bytes_to_hex, file, "$");
+        (void)newXSproto_portable("Data::HexConverter::hexsimd_hex2bin_impl_name", XS_Data__HexConverter_hexsimd_hex2bin_impl_name, file, "");
+        (void)newXSproto_portable("Data::HexConverter::hexsimd_bin2hex_impl_name", XS_Data__HexConverter_hexsimd_bin2hex_impl_name, file, "");
 #if PERL_VERSION_LE(5, 21, 5)
 #  if PERL_VERSION_GE(5, 9, 0)
     if (PL_unitcheckav)

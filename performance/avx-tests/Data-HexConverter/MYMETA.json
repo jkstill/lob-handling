@@ -31,7 +31,9 @@
          }
       },
       "runtime" : {
-         "requires" : {}
+         "requires" : {
+            "Test::More" : "0"
+         }
       }
    },
    "release_status" : "stable",
