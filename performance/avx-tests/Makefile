@@ -30,7 +30,7 @@ PKGDIR  := $(LIBDIR)/pkgconfig
 
 # ----- flags -----
 # Baseline ISA. DO NOT enable AVX globally.
-CFLAGS_BASE ?= -O3 -Wall -Wextra -fPIC -fvisibility=hidden -march=x86-64 -mno-avx -mno-avx2 -mno-avx512f
+CFLAGS_BASE ?= -O3 -Wall -Wextra -fPIC -fvisibility=default -march=x86-64 -mno-avx -mno-avx2 -mno-avx512f
 LDFLAGS     ?=
 # For the shared object: versioned SONAME and RUNPATH to $(LIBDIR) for convenience
 LDFLAGS_SO  ?= -shared -Wl,-soname,$(SONAME)

@@ -1,9 +1,0 @@
-ptrdiff_t T_PTRDIFF
-
-INPUT
-T_PTRDIFF
-	$var = ($type)SvIV($arg);
-
-OUTPUT
-T_PTRDIFF
-	SvSetIV($arg, (IV)$var);
