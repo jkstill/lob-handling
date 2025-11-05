@@ -158,9 +158,13 @@ This is about 3x faster than the previous PL/SQL function.
 
 Convert 2M of hex data to 1M binary blob data
 
+1. C avx512 simd method - Perl Data::HexConverter w/avx512
+  - 0.000094 seconds avg
+1. C avx2 simd method - Perl Data::HexConverter w/avx2
+  - 0.000127 seconds avg
 1. C sse3 simd method
   - 0.000169 seconds avg
-1. Perl Data::HexConverter module
+1. Perl Data::HexConverter module ( sse2 - non avx )
   - 0.000219 seconds avg
 1. C 64k lookup method
   - 0.000372 seconds avg
