@@ -5,8 +5,8 @@
 # this is just a POC script to read a file containing hex characters
 # and convert them to binary
 # it is necessary to read and convert 2 hex characters at a time
-#
-# ./hex-to-bin.pl images/kinglet-02.hex > test.jpg
+# 
+# ./bin-to-hex.pl test.jpg > test.hex
 
 use strict;
 use warnings;
@@ -23,8 +23,8 @@ my $io = IO::File->new($file, 'r') or die "Cannot open file '$file': $!\n";
 # read 1 hex character at a time
 my $c = '';
 while ( $io->read($c,2) ) {
-	# convert to binary
-	print pack('H*',uc($c));
+	# convert to hex
+	print unpack('H*',uc($c));
 	#warn "$c";
 }
 
