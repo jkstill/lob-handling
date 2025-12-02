@@ -1,5 +1,6 @@
 
 -- https://paulzipblog.wordpress.com/2021/11/28/blob-to-hex-and-hex-to-blob/
+-- substr() is very slow
 
 create or replace function BlobToHex(pBlob in blob) return clob is
 -- Converts a blob to a clob containing the hex representation of the blob
