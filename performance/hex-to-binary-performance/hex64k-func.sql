@@ -1,7 +1,8 @@
 
 -- to_blob_hextoraw function
 -- this converts a CLOB containing hex digits to a BLOB
--- it is very fast, because it uses HEXTORAW
+-- the use of dbms_lob.read in slices is much faster than
+-- using dbms_lob.substr
 
 /*
 
