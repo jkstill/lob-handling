@@ -1,8 +1,10 @@
 // hexsimd.c
 // SIMD-accelerated hex<->bin with runtime dispatch.
 // Build modes controlled by Makefile (UNIVERSAL vs NATIVE).
+// make -f make-dist.mk demo
 
 #include "hexsimd.h"
+#include "testdata.h"
 #include <stdlib.h>   // getenv
 #include <strings.h>  // strcasecmp (or use strcmp if you prefer exact case)
 #include <string.h>  // for memcpy
@@ -13,6 +15,15 @@
   #include <intrin.h>
 #else
   #include <immintrin.h>
+#endif
+
+# define HEXSIMD_ENABLE_AVX512 1
+
+/* decide once. at compile time. whether AVX512 code exists in this file */
+#ifdef HEXSIMD_ENABLE_AVX512
+#  define HEXSIMD_HAVE_AVX512 1
+#else
+#  define HEXSIMD_HAVE_AVX512 0
 #endif
 
 // -------------------------
@@ -234,6 +245,14 @@ static ptrdiff_t hex_to_bytes_avx2_impl(const char* src, size_t len, uint8_t* ds
     const __m256i c0=_mm256_set1_epi8('0'), c9p1=_mm256_set1_epi8('9'+1);
     const __m256i cA=_mm256_set1_epi8('A'), cFp1=_mm256_set1_epi8('F'+1);
     const __m256i casebit=_mm256_set1_epi8(0x20), ten=_mm256_set1_epi8(10);
+    const __m256i mask0F=_mm256_set1_epi8(0x0F);
+    const __m256i pack016=_mm256_setr_epi8(
+        16, 1, 16, 1, 16, 1, 16, 1,
+        16, 1, 16, 1, 16, 1, 16, 1,
+        16, 1, 16, 1, 16, 1, 16, 1,
+        16, 1, 16, 1, 16, 1, 16, 1
+    );
+    const __m256i all_ff=_mm256_set1_epi32(-1);
     for (; i+32<=len; i+=32, o+=16) {
         __m256i x = _mm256_loadu_si256((const __m256i*)(src+i));
         __m256i upper = _mm256_andnot_si256(casebit, x);
@@ -245,25 +264,19 @@ static ptrdiff_t hex_to_bytes_avx2_impl(const char* src, size_t len, uint8_t* ds
             _mm256_cmpeq_epi8(_mm256_min_epu8(upper,cFp1), upper));
         if (strict) {
             __m256i valid = _mm256_or_si256(isd, isa);
-            __m256i all = _mm256_cmpeq_epi8(valid, _mm256_set1_epi8((char)0xFF));
-            if ((unsigned)_mm256_movemask_epi8(all) != 0xFFFFFFFFu) return -1;
+            if (!_mm256_testc_si256(valid, all_ff)) return -1;
         }
         __m256i dval = _mm256_sub_epi8(x,c0);
         __m256i lval = _mm256_add_epi8(_mm256_sub_epi8(upper,cA), ten);
         __m256i nib  = _mm256_or_si256(_mm256_and_si256(isd,dval),
                                        _mm256_andnot_si256(isd,lval));
-        nib = _mm256_and_si256(nib, _mm256_set1_epi8(0x0F));
+        nib = _mm256_and_si256(nib, mask0F);
 
-        __m256i even = _mm256_and_si256(nib, _mm256_set1_epi16(0x00FF));
-        __m256i odd  = _mm256_and_si256(_mm256_srli_epi16(nib,8), _mm256_set1_epi16(0x00FF));
-        __m256i w16  = _mm256_or_si256(_mm256_slli_epi16(even,4), odd);
-
-        __m128i lo16 = _mm256_castsi256_si128(w16);
-        __m128i hi16 = _mm256_extracti128_si256(w16,1);
-        __m128i lo8  = _mm_packus_epi16(lo16, _mm_setzero_si128());
-        __m128i hi8  = _mm_packus_epi16(hi16, _mm_setzero_si128());
-        _mm_storel_epi64((__m128i*)(dst+o+0), lo8);
-        _mm_storel_epi64((__m128i*)(dst+o+8), hi8);
+        __m256i pairs = _mm256_maddubs_epi16(nib, pack016);
+        __m128i lo16 = _mm256_castsi256_si128(pairs);
+        __m128i hi16 = _mm256_extracti128_si256(pairs,1);
+        __m128i out8 = _mm_packus_epi16(lo16, hi16);
+        _mm_storeu_si128((__m128i*)(dst+o), out8);
     }
     if (i<len) {
         ptrdiff_t t = hex_to_bytes_scalar_impl(src+i, len-i, dst+o, strict);
@@ -355,10 +368,17 @@ static inline __m512i pack_pairs_avx512_pack(__m512i nib) {
     return _mm512_packus_epi16(w16, _mm512_setzero_si512());              // low 32 bytes are outputs
 }
 
+/* Only build AVX512 version if
+ *  - the compiler is already compiling with AVX512BW+VL,
+ *  - or the build system explicitly asked for it.
+ */
+
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC pop_options
 #endif
 
+//#if (defined(__AVX512BW__) && defined(__AVX512VL__)) || defined(HEXSIMD_ENABLE_AVX512)
+#if HEXSIMD_HAVE_AVX512
 // -------------------------
 // AVX-512BW+VL (512b math, 128/256/512 lanes)
 // -------------------------
@@ -366,7 +386,7 @@ static inline __m512i pack_pairs_avx512_pack(__m512i nib) {
 #pragma GCC push_options
 #pragma GCC target("avx512bw,avx512vl")
 #endif
-#if (defined(__AVX512BW__) && defined(__AVX512VL__)) || (defined(__GNUC__) || defined(__clang__))
+
 
 static ptrdiff_t hex_to_bytes_avx512_impl(const char* src, size_t len, uint8_t* dst, bool strict) {
     if (len & 1) return -1;
@@ -488,10 +508,12 @@ static ptrdiff_t bytes_to_hex_avx512_impl(const uint8_t* src, size_t len, char* 
     return (ptrdiff_t)o;
 }
 
-#endif
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC pop_options
 #endif
+
+#endif // HEXSIMD_HAVE_AVX512
+
 
 // -------------------------
 // Dispatcher
@@ -531,22 +553,26 @@ static void pick_impls(void) {
             g_hex2bin = hex_to_bytes_avx2_impl; g_bin2hex = bytes_to_hex_avx2_impl;
             g_hex2bin_name = "avx2"; g_bin2hex_name = "avx2"; return;
         }
+#if HEXSIMD_HAVE_AVX512
         if (!strcasecmp(force, "avx512") && f.avx512bw && f.avx512vl) {
             extern ptrdiff_t hex_to_bytes_avx512_impl(const char*, size_t, uint8_t*, bool);
             extern ptrdiff_t bytes_to_hex_avx512_impl(const uint8_t*, size_t, char*);
             g_hex2bin = hex_to_bytes_avx512_impl; g_bin2hex = bytes_to_hex_avx512_impl;
             g_hex2bin_name = "avx512bw"; g_bin2hex_name = "avx512bw"; return;
         }
+#endif // HEXSIMD_HAVE_AVX512
         // If forced path isn’t compiled in or supported, we’ll fall through
         // to auto-select below.
     }
 
+#if HEXSIMD_HAVE_AVX512
     if (f.avx512bw && f.avx512vl) {
         extern ptrdiff_t hex_to_bytes_avx512_impl(const char*, size_t, uint8_t*, bool);
         extern ptrdiff_t bytes_to_hex_avx512_impl(const uint8_t*, size_t, char*);
         g_hex2bin = hex_to_bytes_avx512_impl; g_bin2hex = bytes_to_hex_avx512_impl;
         g_hex2bin_name = "avx512bw"; g_bin2hex_name = "avx512bw"; return;
     }
+#endif // HEXSIMD_HAVE_AVX512
     if (f.avx2) {
         extern ptrdiff_t hex_to_bytes_avx2_impl(const char*, size_t, uint8_t*, bool);
         extern ptrdiff_t bytes_to_hex_avx2_impl(const uint8_t*, size_t, char*);
@@ -589,26 +615,30 @@ static void dump_features(void){
 
 int main(void){
     dump_features(); 
-    char *hx = "32D45FA2883337F16CAF523264E538D1AD89BD2924B67693AF1A7BCE7C6041AC96528A702C1FCAB51F75B14B6A5F20B1BAAFD93E9AC30769247EB6FAF408087F38E4BFB318CFA3A38FBA7206081ECEB9E7C4BC25201A14D5BCC6A6590B96A4738C9BCE941C541D688C8195550F6EF9CEEDD06353FB7A033AF63B40701632049C";
+    //char *hx = "32D45FA2883337F16CAF523264E538D1AD89BD2924B67693AF1A7BCE7C6041AC96528A702C1FCAB51F75B14B6A5F20B1BAAFD93E9AC30769247EB6FAF408087F38E4BFB318CFA3A38FBA7206081ECEB9E7C4BC25201A14D5BCC6A6590B96A4738C9BCE941C541D688C8195550F6EF9CEEDD06353FB7A033AF63B40701632049C";
+    const char *hx = testdata;
     size_t BIN_LEN = strlen(hx)+1;
     uint8_t *bin = malloc(BIN_LEN);
     char *back = malloc( (BIN_LEN * 2) +1);
     memset(back, 0x5A, BIN_LEN * 2);
 		   
-    ptrdiff_t n = hex_to_bytes(hx, strlen(hx), bin, true);
+    //ptrdiff_t n = hex_to_bytes(hx, strlen(hx), bin, true);
+    ptrdiff_t n = hex_to_bytes(hx, BIN_LEN-1, bin, true);
     if (n < 0) { puts("parse failed"); return 1; }
     ptrdiff_t m = bytes_to_hex(bin, (size_t)n, back);
     back[m] = 0;
     puts(hexsimd_hex2bin_impl_name());
 
-    int match = strcmp(hx,back);
+	 // case may not match, so use strcasecmp
+    int match = strcasecmp(hx,back);
 
     if (match == 0 ){
-        puts(back);
+        //puts(back);
+		  ;
     } else {
 	printf("match: %d\n", match);
-        printf("Source: %s\n",hx);
-        printf("  Dest: %s\n",back);
+        //printf("Source: %s\n",hx);
+        //printf("  Dest: %s\n",back);
         printf("Error! Src and Dest do not match\n");
 	// use scalar to convert back to hex and compare, as we know that works
 	char *scalar_compare  = malloc( (BIN_LEN * 2) +1);
@@ -630,4 +660,3 @@ int main(void){
 }
 
 #endif
-
