@@ -10,6 +10,7 @@
 #include <string.h>  // for memcpy
 #include <stdio.h>
 #include <stdint.h>
+#include <time.h>
 
 #if defined(_MSC_VER)
   #include <intrin.h>
@@ -623,7 +624,17 @@ int main(void){
     memset(back, 0x5A, BIN_LEN * 2);
 		   
     //ptrdiff_t n = hex_to_bytes(hx, strlen(hx), bin, true);
+	 // get elapsed time for hex_to_bytes
+
+    struct timespec start, end;
+    double total_time = 0;
+	 clock_gettime(CLOCK_MONOTONIC, &start);
+
     ptrdiff_t n = hex_to_bytes(hx, BIN_LEN-1, bin, true);
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    total_time += (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+
     if (n < 0) { puts("parse failed"); return 1; }
     ptrdiff_t m = bytes_to_hex(bin, (size_t)n, back);
     back[m] = 0;
@@ -634,7 +645,8 @@ int main(void){
 
     if (match == 0 ){
         //puts(back);
-		  ;
+		  printf("bytes converted: %td\n", BIN_LEN);
+        printf("elapsed time: %f seconds\n", total_time);
     } else {
 	printf("match: %d\n", match);
         //printf("Source: %s\n",hx);
@@ -645,7 +657,7 @@ int main(void){
         memset(scalar_compare, 0x5A, BIN_LEN * 2);
 	ptrdiff_t t = bytes_to_hex_scalar_impl(bin, (size_t)n,scalar_compare);
 	scalar_compare[t] = 0;
-	match = strcmp(hx,scalar_compare);
+	match = strcasecmp(hx,scalar_compare);
         if (match == 0 ){
             printf("Hex2Bin OK\n");
 	} else {
