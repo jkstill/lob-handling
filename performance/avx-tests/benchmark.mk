@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O3 -Wall -Wextra -fPIC -fvisibility=hidden -march=native
+CFLAGS = -O3 -Wall -Wextra -fPIC -fvisibility=hidden -march=native -mavx2
 LDFLAGS = -lrt
 
 TARGET = benchmark
